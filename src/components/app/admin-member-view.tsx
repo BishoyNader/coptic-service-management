@@ -7,6 +7,7 @@ import { cn } from "cn"
 import { QRCodeSVG } from "qrcode.react"
 import { toast } from "sonner"
 import { formatArabicDate, formatArabicDateTime } from "@/lib/dates"
+import { SCORING_CATEGORY_LABELS, type ScoringCategory } from "@/lib/constants"
 import type { Profile, UserStatus } from "@/lib/types"
 import { AdminProfileEdit, type AdminProfileSubmit } from "./admin-profile-edit"
 import {
@@ -314,7 +315,9 @@ export function AdminMemberView({
                   {scores.map((s) => (
                     <div key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
                       <div>
-                        <p className="font-medium">{s.category}</p>
+                        <p className="font-medium">
+                          {SCORING_CATEGORY_LABELS[s.category as ScoringCategory] ?? s.category}
+                        </p>
                         <p className="text-[11px] text-muted-foreground">
                           {formatArabicDate(s.session_date)}
                         </p>

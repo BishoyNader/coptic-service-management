@@ -3,7 +3,8 @@ import Link from "next/link"
 import { QrCode, Star, CalendarDays, History, Bell, Church } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
-import { startOfWeek, startOfMonth, toDateString, formatArabicDate } from "@/lib/dates"
+import { getMemberScoreView } from "@/services/scoring-service"
+import { formatArabicDate } from "@/lib/dates"
 import { formatCairoTime } from "@/lib/cairo"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
 import { WelcomeCard } from "@/components/app/welcome-card"
@@ -32,24 +33,14 @@ export default async function MemberHomePage({
 
   const { welcome } = (await searchParams) ?? {}
 
-  const [codesResult, weekResult, monthResult, attendanceResult, notifResult] = await Promise.all([
+  const [codesResult, scoreView, attendanceResult, notifResult] = await Promise.all([
     supabase
       .from("personal_codes")
       .select("code, qr_token")
       .eq("profile_id", profile.id)
       .maybeSingle(),
-    supabase
-      .from("score_records")
-      .select("points")
-      .eq("profile_id", profile.id)
-      .gte("session_date", toDateString(startOfWeek()))
-      .lte("session_date", toDateString(new Date())),
-    supabase
-      .from("score_records")
-      .select("points")
-      .eq("profile_id", profile.id)
-      .gte("session_date", toDateString(startOfMonth()))
-      .lte("session_date", toDateString(new Date())),
+    // Centralized scoring engine — weekly/monthly totals, Cairo periods.
+    getMemberScoreView(supabase, profile.id),
     supabase
       .from("attendance_records")
       .select(
@@ -66,10 +57,10 @@ export default async function MemberHomePage({
       .is("read_at", null),
   ])
 
-  const week = weekResult.data?.reduce((s, r) => s + Number(r.points), 0) ?? 0
-  const month = monthResult.data?.reduce((s, r) => s + Number(r.points), 0) ?? 0
-  const hasWeek = (weekResult.data?.length ?? 0) > 0
-  const hasMonth = (monthResult.data?.length ?? 0) > 0
+  const week = scoreView.week.total
+  const month = scoreView.month.total
+  const hasWeek = scoreView.week.hasAny
+  const hasMonth = scoreView.month.hasAny
   const attendanceRows = (attendanceResult.data ?? []) as unknown as AttendanceRow[]
   const lastAttendance = attendanceRows[0]?.attended_at ?? null
   const lastAttendanceType = (attendanceRows[0]?.session?.type as "CHURCH" | "SERVICE" | undefined) ?? null
