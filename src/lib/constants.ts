@@ -80,3 +80,21 @@ export const SCORING_CATEGORY_LABELS = {
 } as const
 
 export type ScoringCategory = keyof typeof SCORING_CATEGORY_LABELS
+
+/**
+ * Attendance contexts, mirroring the `attendance_type` enum values.
+ * Adding a future attendance type = add it here + seed a scoring rule for the
+ * new category; no component logic needs to change (labels only, the scoring
+ * engine reads the active rules from the database).
+ */
+export const ATTENDANCE_TYPE_LABELS = {
+  CHURCH: "حضور القداس",
+  SERVICE: "حضور الخدمة",
+} as const
+
+/** How an attendance record was created. */
+export const ATTENDANCE_SOURCE_LABELS = {
+  QR: "QR",
+  CODE: "كود يدوي",
+  MANUAL: "تسجيل يدوي",
+} as const

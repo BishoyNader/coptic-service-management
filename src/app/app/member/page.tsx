@@ -1,12 +1,22 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { QrCode, Star, CalendarDays, History, Bell } from "lucide-react"
+import { QrCode, Star, CalendarDays, History, Bell, Church } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { startOfWeek, startOfMonth, toDateString, formatArabicDate } from "@/lib/dates"
+import { formatCairoTime } from "@/lib/cairo"
+import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
 import { WelcomeCard } from "@/components/app/welcome-card"
 import { NileDivider } from "@/components/coptic/brand"
 import { Button } from "@/components/ui/button"
+import { MemberAttendanceList, type MemberAttendanceItem } from "@/components/app/member-attendance-list"
+
+type AttendanceRow = {
+  id: string
+  attended_at: string
+  points: number
+  session?: { type?: string } | null
+}
 
 export default async function MemberHomePage({
   searchParams,
@@ -42,12 +52,13 @@ export default async function MemberHomePage({
       .lte("session_date", toDateString(new Date())),
     supabase
       .from("attendance_records")
-      .select("attended_at")
+      .select(
+        "id, attended_at, points, session:attendance_sessions(type)"
+      )
       .eq("profile_id", profile.id)
-      .in("status", ["PRESENT", "LATE"])
+      .neq("status", "ARCHIVED")
       .order("attended_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(10),
     supabase
       .from("notification_recipients")
       .select("id", { count: "exact", head: true })
@@ -59,7 +70,16 @@ export default async function MemberHomePage({
   const month = monthResult.data?.reduce((s, r) => s + Number(r.points), 0) ?? 0
   const hasWeek = (weekResult.data?.length ?? 0) > 0
   const hasMonth = (monthResult.data?.length ?? 0) > 0
-  const lastAttendance = attendanceResult.data?.attended_at ?? null
+  const attendanceRows = (attendanceResult.data ?? []) as unknown as AttendanceRow[]
+  const lastAttendance = attendanceRows[0]?.attended_at ?? null
+  const lastAttendanceType = (attendanceRows[0]?.session?.type as "CHURCH" | "SERVICE" | undefined) ?? null
+  const lastAttendancePoints = lastAttendance ? Number(attendanceRows[0]?.points ?? 0) : 0
+  const history: MemberAttendanceItem[] = attendanceRows.map((r) => ({
+    id: r.id,
+    attended_at: r.attended_at,
+    points: Number(r.points),
+    type: (r.session?.type as "CHURCH" | "SERVICE") ?? "CHURCH",
+  }))
   const unread = notifResult.count ?? 0
 
   if (welcome && codesResult.data) {
@@ -123,7 +143,16 @@ export default async function MemberHomePage({
           title="آخر حضور"
           hasData={!!lastAttendance}
           emptyText="لسه مفيش حضور مسجل"
-          value={lastAttendance ? formatArabicDate(lastAttendance) : ""}
+          value={
+            lastAttendance
+              ? `${lastAttendanceType ? ATTENDANCE_TYPE_LABELS[lastAttendanceType] + " — " : ""}${
+                  formatArabicDate(lastAttendance)
+                } ${formatCairoTime(lastAttendance)}`
+              : ""
+          }
+          pointsLabel={
+            lastAttendance && lastAttendancePoints > 0 ? `+${lastAttendancePoints} نقطة` : null
+          }
         />
         <LinkCard
           href="/app/member/notifications"
@@ -132,6 +161,17 @@ export default async function MemberHomePage({
           hasData={unread > 0}
           value={unread > 0 ? `${unread} جديد` : "مفيش إشعارات جديدة"}
         />
+      </div>
+
+      {/* Attendance history */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-coptic-teal/10 text-coptic-teal">
+            <Church className="size-4" />
+          </span>
+          <p className="font-heading font-bold">سجل الحضور</p>
+        </div>
+        <MemberAttendanceList records={history} />
       </div>
 
       <NileDivider />
@@ -177,11 +217,13 @@ function HistoryCard({
   value,
   hasData,
   emptyText,
+  pointsLabel,
 }: {
   title: string
   value: string
   hasData: boolean
   emptyText: string
+  pointsLabel?: string | null
 }) {
   return (
     <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
@@ -192,7 +234,12 @@ function HistoryCard({
         <span>{title}</span>
       </div>
       {hasData ? (
-        <p className="mt-2 font-heading text-xl font-extrabold text-foreground">{value}</p>
+        <div className="mt-2">
+          <p className="font-heading text-lg font-extrabold text-foreground">{value}</p>
+          {pointsLabel ? (
+            <p className="text-sm font-bold text-coptic-gold">{pointsLabel}</p>
+          ) : null}
+        </div>
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">{emptyText}</p>
       )}
