@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { Users, Pencil, Trash2, Phone } from "lucide-react"
+import Link from "next/link"
+import { Users, Phone, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { EmptyState } from "@/components/coptic/empty-state"
-import { Button } from "@/components/ui/button"
+import { AddUserButton } from "@/components/app/add-user-button"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
@@ -23,17 +24,12 @@ export default async function SuperAdminMembersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-xl font-extrabold">المخدومين</h1>
-          <p className="text-sm text-muted-foreground">
-            {count ?? 0} مخدوم
-          </p>
+          <p className="text-sm text-muted-foreground">{count ?? 0} مخدوم</p>
         </div>
-        <Button className="gap-1.5">
-          <span className="text-lg leading-none">+</span>
-          إضافة
-        </Button>
+        <AddUserButton label="إضافة مخدوم" defaultRole="SERVED_MEMBER" />
       </div>
 
       {!members || members.length === 0 ? (
@@ -41,14 +37,15 @@ export default async function SuperAdminMembersPage() {
           icon={<Users className="size-7" />}
           title="لا يوجد مخدومين حتى الآن"
           description="أول مخدوم بيبدأ الرحلة هنا"
-          action={<Button className="gap-1.5"><span className="text-lg leading-none">+</span> إضافة مخدوم</Button>}
+          action={<AddUserButton label="إضافة مخدوم" defaultRole="SERVED_MEMBER" />}
         />
       ) : (
         <div className="space-y-2">
           {members.map((m) => (
-            <div
+            <Link
               key={m.id}
-              className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5"
+              href={`/app/super-admin/user/${m.id}`}
+              className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-secondary/50"
             >
               <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
                 {m.full_name.trim().charAt(0)}
@@ -60,21 +57,8 @@ export default async function SuperAdminMembersPage() {
                   {m.phone}
                 </p>
               </div>
-              <button
-                type="button"
-                aria-label="تعديل"
-                className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              >
-                <Pencil className="size-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="حذف"
-                className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
+              <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
+            </Link>
           ))}
         </div>
       )}

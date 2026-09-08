@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { EmptyState } from "@/components/coptic/empty-state"
-import { Button } from "@/components/ui/button"
+import { AddUserButton } from "@/components/app/add-user-button"
 
 export const metadata: Metadata = { title: "الخدام" }
 
@@ -30,10 +30,7 @@ export default async function SuperAdminServantsPage() {
           <h1 className="font-heading text-xl font-extrabold">الخدام</h1>
           <p className="text-sm text-muted-foreground">{count ?? 0} خادم</p>
         </div>
-        <Button className="gap-1.5">
-          <span className="text-lg leading-none">+</span>
-          إضافة
-        </Button>
+        <AddUserButton label="إضافة خادم" defaultRole="SERVANT" />
       </div>
 
       {!servants || servants.length === 0 ? (
@@ -41,7 +38,7 @@ export default async function SuperAdminServantsPage() {
           icon={<HeartHandshake className="size-7" />}
           title="لا يوجد خدام حتى الآن"
           description="الخدام بيتابعوا الخدمة من هنا"
-          action={<Button className="gap-1.5"><span className="text-lg leading-none">+</span> إضافة خادم</Button>}
+          action={<AddUserButton label="إضافة خادم" defaultRole="SERVANT" />}
         />
       ) : (
         <div className="space-y-2">

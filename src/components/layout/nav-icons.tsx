@@ -12,6 +12,7 @@ import {
   History,
   Settings,
   HeartHandshake,
+  ClipboardList,
   Menu,
   type LucideIcon,
 } from "lucide-react"
@@ -30,6 +31,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   history: History,
   settings: Settings,
+  clipboard: ClipboardList,
   menu: Menu,
 }
 

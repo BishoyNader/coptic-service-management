@@ -12,7 +12,7 @@ export type NavItem = {
 
 export const MEMBER_NAV: NavItem[] = [
   { href: "/app/member", label: "الرئيسية", icon: "home" },
-  { href: "/app/member/qr", label: "QR Code", icon: "qr" },
+  { href: "/app/member/qr", label: "QR", icon: "qr" },
   { href: "/app/member/scores", label: "الدرجات", icon: "star" },
   { href: "/app/member/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/member/account", label: "حسابي", icon: "user" },
@@ -20,7 +20,8 @@ export const MEMBER_NAV: NavItem[] = [
 
 export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant", label: "الرئيسية", icon: "home" },
-  { href: "/app/servant/qr", label: "QR Code", icon: "qr" },
+  { href: "/app/servant/qr", label: "QR", icon: "qr" },
+  { href: "/app/servant/activities", label: "الأنشطة", icon: "clipboard" },
   { href: "/app/servant/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/servant/account", label: "حسابي", icon: "user" },
 ]

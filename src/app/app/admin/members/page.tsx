@@ -1,10 +1,12 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { Users, Phone } from "lucide-react"
+import Link from "next/link"
+import { Users, Phone, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { EmptyState } from "@/components/coptic/empty-state"
+import { AddMemberButton } from "@/components/app/add-member-button"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
@@ -22,20 +24,25 @@ export default async function AdminMembersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-heading text-xl font-extrabold">المخدومين</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-heading text-xl font-extrabold">المخدومين</h1>
+        <AddMemberButton />
+      </div>
 
       {!members || members.length === 0 ? (
         <EmptyState
           icon={<Users className="size-7" />}
           title="لا يوجد مخدومين حتى الآن"
-          description="لما يسجّل أول مخدوم، هيظهر هنا"
+          description="لما تسجّل أو تضيف أول مخدوم، هيظهر هنا"
+          action={<AddMemberButton />}
         />
       ) : (
         <div className="space-y-2">
           {members.map((m) => (
-            <div
+            <Link
               key={m.id}
-              className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5"
+              href={`/app/admin/members/${m.id}`}
+              className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-secondary/50"
             >
               <div className="flex size-11 items-center justify-center rounded-full bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
                 {m.full_name.trim().charAt(0)}
@@ -47,7 +54,8 @@ export default async function AdminMembersPage() {
                   {m.phone}
                 </p>
               </div>
-            </div>
+              <ChevronLeft className="size-5 text-muted-foreground" />
+            </Link>
           ))}
         </div>
       )}

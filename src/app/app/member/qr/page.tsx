@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { QrCodeCard } from "@/components/app/qr-code-card"
+import { EmptyState } from "@/components/coptic/empty-state"
+import { QrCode } from "lucide-react"
 
 export const metadata: Metadata = { title: "QR Code" }
 
@@ -27,9 +29,14 @@ export default async function MemberQrPage() {
           value={codes.qr_token}
           name={profile.full_name}
           personalCode={codes.code}
+          size={200}
         />
       ) : (
-        <p className="mt-20 text-center text-muted-foreground">لم يتم إنشاء الكود بعد</p>
+        <EmptyState
+          icon={<QrCode className="size-7" />}
+          title="لم يتم إنشاء الكود بعد"
+          description="الكود الشخصي بيتولد لوحدو لما يسجّل الحساب"
+        />
       )}
     </div>
   )
