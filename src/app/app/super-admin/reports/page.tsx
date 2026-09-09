@@ -1,10 +1,9 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { BarChart3 } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
-import { EmptyState } from "@/components/coptic/empty-state"
+import { ReportsView } from "@/components/app/reports-view"
 
 export const metadata: Metadata = { title: "التقارير" }
 
@@ -15,12 +14,13 @@ export default async function SuperAdminReportsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-heading text-xl font-extrabold">التقارير</h1>
-      <EmptyState
-        icon={<BarChart3 className="size-7" />}
-        title="لا توجد تقارير بعد"
-        description="تقارير الحضور والدرجات والنشاط هتتولّد هنا"
-      />
+      <div>
+        <h1 className="font-heading text-xl font-extrabold">التقارير</h1>
+        <p className="text-sm text-muted-foreground">
+          تقارير الحضور والدرجات وأنشطة الخدام — متاحة لمسؤول عام
+        </p>
+      </div>
+      <ReportsView />
     </div>
   )
 }
