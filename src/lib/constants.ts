@@ -87,6 +87,13 @@ export type ScoringCategory = keyof typeof SCORING_CATEGORY_LABELS
  * new category; no component logic needs to change (labels only, the scoring
  * engine reads the active rules from the database).
  */
+/** Audience groups an admin can broadcast a notification to. */
+export const NOTIFICATION_AUDIENCE_LABELS = {
+  SERVED_MEMBER: "المخدومين",
+  SERVANT: "الخدام",
+  ADMIN: "المسؤولين",
+} as const
+
 export const ATTENDANCE_TYPE_LABELS = {
   CHURCH: "حضور القداس",
   SERVICE: "حضور الخدمة",

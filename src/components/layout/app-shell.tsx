@@ -6,6 +6,7 @@ import { useState } from "react"
 import { Bell, LogOut, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
 import { CopticBadge } from "@/components/coptic/brand"
+import { NotificationBadge } from "@/components/app/notification-badge"
 import { createClient } from "@/lib/supabase/client"
 import type { NavItem } from "@/lib/constants"
 import { MOBILE_TAB_LIMIT } from "@/lib/constants"
@@ -21,10 +22,11 @@ type AppShellProps = {
   roleLabel: string
   name: string
   nav: NavItem[]
+  showUnreadBadge?: boolean
   children: React.ReactNode
 }
 
-export function AppShell({ roleLabel, name, nav, children }: AppShellProps) {
+export function AppShell({ roleLabel, name, nav, showUnreadBadge = false, children }: AppShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -70,6 +72,9 @@ export function AppShell({ roleLabel, name, nav, children }: AppShellProps) {
             >
               <Icon name={item.icon} className="size-4.5" />
               {item.label}
+              {showUnreadBadge && item.href.endsWith("/notifications") ? (
+                <NotificationBadge className="ms-auto" />
+              ) : null}
             </Link>
           ))}
         </nav>
@@ -137,6 +142,9 @@ export function AppShell({ roleLabel, name, nav, children }: AppShellProps) {
             >
               <Icon name={item.icon} className="size-4.5" />
               {item.label}
+              {showUnreadBadge && item.href.endsWith("/notifications") ? (
+                <NotificationBadge className="ms-auto" />
+              ) : null}
             </Link>
           ))}
           <button
@@ -171,7 +179,12 @@ export function AppShell({ roleLabel, name, nav, children }: AppShellProps) {
                   active ? "text-coptic-teal" : "text-muted-foreground"
                 )}
               >
-                <Icon name={item.icon} className="size-5" />
+                <span className="relative">
+                  <Icon name={item.icon} className="size-5" />
+                  {showUnreadBadge && item.href.endsWith("/notifications") ? (
+                    <NotificationBadge className="absolute -end-2.5 -top-1.5 border-2 border-card" />
+                  ) : null}
+                </span>
                 {item.label}
               </Link>
             )
