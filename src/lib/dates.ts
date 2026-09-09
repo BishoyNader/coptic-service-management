@@ -1,3 +1,5 @@
+import { cairoDateString } from "./cairo"
+
 /** Start of the current week (Monday 00:00) in local time. */
 export function startOfWeek(now = new Date()): Date {
   const d = new Date(now)
@@ -71,15 +73,39 @@ export function formatArabicDateTime(date: Date | string): string {
   })}`
 }
 
-/** Days remaining until the next occurrence of a birth date. */
+/** True for leap years (Gregorian). */
+export function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+}
+
+/** The birthday for a given year, clamping Feb 29 in non-leap years to Feb 28. */
+export function birthdayOccurrenceForYear(birthDate: string, year: number): string {
+  const [, month, day] = birthDate.split("-").map(Number)
+  const occurrenceDay = month === 2 && day === 29 && !isLeapYear(year) ? 28 : day
+  return `${year}-${String(month).padStart(2, "0")}-${String(occurrenceDay).padStart(2, "0")}`
+}
+
+/** Whole days between two YYYY-MM-DD dates (fromDate → toDate, signed). */
+export function daysBetweenDates(fromDate: string, toDate: string): number {
+  const [fy, fm, fd] = fromDate.split("-").map(Number)
+  const [ty, tm, td] = toDate.split("-").map(Number)
+  const fromUtc = Date.UTC(fy, fm - 1, fd)
+  const toUtc = Date.UTC(ty, tm - 1, td)
+  return Math.round((toUtc - fromUtc) / 86_400_000)
+}
+
+/**
+ * Next occurrence of a birth date on or after an anchor YYYY-MM-DD date.
+ * Compares month/day (rolled into a calendar date string), never a timestamp.
+ */
+export function nextBirthdayDateString(birthDate: string, fromDate: string): string {
+  const fromYear = Number(fromDate.split("-")[0])
+  const candidate = birthdayOccurrenceForYear(birthDate, fromYear)
+  if (candidate >= fromDate) return candidate
+  return birthdayOccurrenceForYear(birthDate, fromYear + 1)
+}
+
+/** Days remaining until the next occurrence of a birth date (Cairo calendar). */
 export function daysUntilBirthday(birthDate: string, now = new Date()): number {
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-  const bd = new Date(birthDate)
-  const next = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
-  if (next < today) {
-    next.setFullYear(next.getFullYear() + 1)
-  }
-  const diff = Math.round((next.getTime() - today.getTime()) / 86400000)
-  return diff
+  return daysBetweenDates(cairoDateString(now), nextBirthdayDateString(birthDate, cairoDateString(now)))
 }
