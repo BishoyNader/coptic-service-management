@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceManagement } from "@/components/app/attendance-management"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
 import { ManualAttendanceDialog } from "@/components/app/manual-attendance-dialog"
+import { ATTENDANCE_PAGE_SIZE } from "@/lib/pagination"
+import { loadMoreAttendanceAction } from "@/app/actions/listing"
 
 export const metadata: Metadata = { title: "الحضور" }
 
@@ -28,7 +30,8 @@ export default async function SuperAdminAttendancePage() {
       )
       .gte("attended_at", since)
       .order("attended_at", { ascending: false })
-      .limit(2000),
+      .order("id")
+      .limit(ATTENDANCE_PAGE_SIZE),
     supabase
       .from("profiles")
       .select("id, full_name, role, phone")
@@ -69,7 +72,12 @@ export default async function SuperAdminAttendancePage() {
           description="ابدأ بتسجيل أول حضور 📷"
         />
       ) : (
-        <AttendanceManagement records={records} />
+        <>
+          <AttendanceManagement records={records} loadMore={loadMoreAttendanceAction} />
+          <p className="text-center text-xs text-muted-foreground">
+            بسعة تحميل تدريجية — السجل بينزل على أجزاء عشان الأداء
+          </p>
+        </>
       )}
     </div>
   )

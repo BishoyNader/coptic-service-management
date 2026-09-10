@@ -1,7 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { updateSession } from "@/lib/supabase/proxy"
 
-const PUBLIC_PREFIXES = ["/login", "/register"]
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/callback",
+]
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true
@@ -29,7 +35,13 @@ export async function proxy(request: NextRequest) {
   }
 
   // Authenticated user on public pages → send them to their home.
+  // Exception: the password-recovery surfaces must stay reachable for a
+  // freshly-persisted recovery session (set-session) so the user can set a
+  // new password instead of being bounced to their dashboard.
   if (isPublicPath(pathname)) {
+    if (pathname === "/reset-password" || pathname === "/auth/callback") {
+      return supabaseResponse
+    }
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")

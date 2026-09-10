@@ -5,27 +5,46 @@ import { Users, Phone, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AddMemberButton } from "@/components/app/add-member-button"
+import { PaginationControls } from "@/components/app/pagination-controls"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
-export default async function AdminMembersPage() {
+export default async function AdminMembersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
   const supabase = await createClient()
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.ADMIN) redirect("/")
 
-  const { data: members } = await supabase
+  const sp = await searchParams
+  const rawPage = Number.parseInt(sp.page ?? "", 10) || 1
+  const page = Math.max(1, rawPage)
+  const from = (page - 1) * LIST_PAGE_SIZE
+  const to = from + LIST_PAGE_SIZE - 1
+
+  const { data: members, count } = await supabase
     .from("profiles")
-    .select("id, full_name, phone, status")
+    .select("id, full_name, phone, status", { count: "exact" })
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
-    .limit(100)
+    .order("id")
+    .range(from, to)
+
+  const total = count ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE))
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-xl font-extrabold">المخدومين</h1>
+        <div>
+          <h1 className="font-heading text-xl font-extrabold">المخدومين</h1>
+          <p className="text-sm text-muted-foreground">{total} مخدوم</p>
+        </div>
         <AddMemberButton />
       </div>
 
@@ -37,27 +56,36 @@ export default async function AdminMembersPage() {
           action={<AddMemberButton />}
         />
       ) : (
-        <div className="space-y-2">
-          {members.map((m) => (
-            <Link
-              key={m.id}
-              href={`/app/admin/members/${m.id}`}
-              className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-secondary/50"
-            >
-              <div className="flex size-11 items-center justify-center rounded-full bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
-                {m.full_name.trim().charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{m.full_name}</p>
-                <p className="flex items-center gap-1 text-[11px] text-muted-foreground" dir="ltr">
-                  <Phone className="size-3" />
-                  {m.phone}
-                </p>
-              </div>
-              <ChevronLeft className="size-5 text-muted-foreground" />
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="space-y-2">
+            {members.map((m) => (
+              <Link
+                key={m.id}
+                href={`/app/admin/members/${m.id}`}
+                className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-secondary/50"
+              >
+                <div className="flex size-11 items-center justify-center rounded-full bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
+                  {m.full_name.trim().charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{m.full_name}</p>
+                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground" dir="ltr">
+                    <Phone className="size-3" />
+                    {m.phone}
+                  </p>
+                </div>
+                <ChevronLeft className="size-5 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+
+          <PaginationControls
+            pathname="/app/admin/members"
+            page={page}
+            totalPages={totalPages}
+            total={total}
+          />
+        </>
       )}
     </div>
   )

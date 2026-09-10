@@ -12,12 +12,16 @@ import {
   Power,
   Archive,
   Loader2,
+  Plus,
 } from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
 import { ROLE_LABELS, type AppRole } from "@/lib/roles"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
+import { type ListedUser } from "@/app/actions/listing"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,18 +35,16 @@ import {
 } from "@/components/ui/alert-dialog"
 
 type UsersListProps = {
-  users: {
-    id: string
-    full_name: string
-    phone: string
-    role: AppRole
-    status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
-  }[]
+  users: ListedUser[]
   homePrefix: string
   onToggleStatus: (
     id: string,
     status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
   ) => Promise<{ ok: boolean; message: string }>
+  /** When provided, renders a "عرض المزيد" button that loads the next page. */
+  loadMore?: (
+    offset: number
+  ) => Promise<{ ok: boolean; users: ListedUser[]; message?: string }>
 }
 
 const STATUS_LABELS = {
@@ -51,16 +53,42 @@ const STATUS_LABELS = {
   ARCHIVED: "مؤرشف",
 } as const
 
-export function UsersList({ users, homePrefix, onToggleStatus }: UsersListProps) {
+/** Merges a fresh server page into the loaded list, keeping appended rows. */
+function mergeById(
+  prev: ListedUser[],
+  incoming: ListedUser[]
+): ListedUser[] {
+  const serverMap = new Map(incoming.map((u) => [u.id, u]))
+  const merged = prev.map((u) => serverMap.get(u.id) ?? u)
+  for (const u of incoming) {
+    if (!merged.some((x) => x.id === u.id)) merged.push(u)
+  }
+  return merged
+}
+
+export function UsersList({
+  users,
+  homePrefix,
+  onToggleStatus,
+  loadMore,
+}: UsersListProps) {
   const router = useRouter()
+  const [items, setItems] = useState(users)
+  const [prevUsers, setPrevUsers] = useState(users)
+  if (users !== prevUsers) {
+    setPrevUsers(users)
+    setItems((prev) => mergeById(prev, users))
+  }
   const [query, setQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<AppRole | "ALL">("ALL")
   const [pendingId, setPendingId] = useState<string | null>(null)
-  const [archiveTarget, setArchiveTarget] = useState<(typeof users)[number] | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<ListedUser | null>(null)
   const [archiving, setArchiving] = useState(false)
+  const [pendingMore, setPendingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(users.length === LIST_PAGE_SIZE)
 
   const filtered = useMemo(() => {
-    let list = users
+    let list = items
     if (roleFilter !== "ALL") {
       list = list.filter((u) => u.role === roleFilter)
     }
@@ -73,7 +101,25 @@ export function UsersList({ users, homePrefix, onToggleStatus }: UsersListProps)
       )
     }
     return list
-  }, [users, query, roleFilter])
+  }, [items, query, roleFilter])
+
+  const handleLoadMore = async () => {
+    if (!loadMore || pendingMore) return
+    setPendingMore(true)
+    const result = await loadMore(items.length)
+    setPendingMore(false)
+    if (result.ok) {
+      if (result.users.length > 0) {
+        setItems((prev) => {
+          const seen = new Set(prev.map((u) => u.id))
+          return [...prev, ...result.users.filter((u) => !seen.has(u.id))]
+        })
+      }
+      setHasMore(result.users.length === LIST_PAGE_SIZE)
+    } else {
+      toast.error(result.message || "حدث خطأ أثناء التحميل")
+    }
+  }
 
   const roleIcon = (role: AppRole) => {
     switch (role) {
@@ -261,6 +307,21 @@ export function UsersList({ users, homePrefix, onToggleStatus }: UsersListProps)
           ))}
         </div>
       )}
+
+      {loadMore && filtered.length > 0 ? (
+        <div className="flex justify-center pt-1">
+          {hasMore ? (
+            <Button variant="outline" onClick={handleLoadMore} disabled={pendingMore}>
+              {pendingMore ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              {pendingMore ? "جاري التحميل..." : "عرض المزيد"}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       {archiveTarget ? (
         <AlertDialog open onOpenChange={() => setArchiveTarget(null)}>

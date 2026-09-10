@@ -1,79 +1,14 @@
 import { test, expect, type Page } from "@playwright/test"
-import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
-import { config as loadEnv } from "dotenv"
-
-loadEnv({ path: ".env.local" })
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-function randomPhone(): string {
-  return "01" + String(Math.floor(100000000 + Math.random() * 900000000)).padStart(9, "0")
-}
-
-function randomName(prefix: string): string {
-  return `${prefix} ت${Math.random().toString(36).slice(2, 6)} يدوي`
-}
-
-function normalizePhone(phone: string): string {
-  const trimmed = phone.trim()
-  if (/^\d+$/.test(trimmed)) {
-    if (trimmed.startsWith("0")) return trimmed.replace(/^0/, "+20")
-    if (trimmed.startsWith("20") && trimmed.length >= 11) return `+${trimmed}`
-    return `+${trimmed}`
-  }
-  return trimmed
-}
-
-async function login(page: Page, phone: string, password: string) {
-  await page.goto("/login")
-  await page.getByLabel("رقم الموبايل أو الإيميل").fill(phone)
-  await page.locator("#password").fill(password)
-  await page.getByRole("button", { name: "تسجيل الدخول" }).click()
-}
-
-async function logout(page: Page) {
-  const btn = page.getByRole("button", { name: /خروج/ })
-  if (await btn.first().isVisible()) {
-    await btn.first().click()
-  }
-}
-
-async function createSeedAdmin(
-  admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
-  phone: string,
-  password: string
-) {
-  const normalized = normalizePhone(phone)
-  const displayName = role === "ADMIN" ? "إيكونوموس اختبار" : "رئيس شمامسة اختبار"
-
-  const { data: authData, error: authError } = await admin.auth.admin.createUser({
-    phone: normalized,
-    password,
-    phone_confirm: true,
-    email_confirm: true,
-    user_metadata: { full_name: displayName, role },
-  })
-  if (authError) throw new Error(`seed admin auth: ${authError.message}`)
-
-  const userId = authData.user.id
-
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: userId,
-    role,
-    full_name: displayName,
-    phone: normalized,
-  })
-  if (profileError) throw new Error(`seed admin profile: ${profileError.message}`)
-
-  const { error: adminProfileError } = await admin
-    .from("admin_profiles")
-    .insert({ profile_id: userId })
-  if (adminProfileError) throw new Error(`seed admin_profiles: ${adminProfileError.message}`)
-
-  return { userId, phone: normalized, phoneRaw: phone, password, displayName }
-}
+import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  createSupabaseAdmin,
+  randomPhone,
+  randomName,
+  login,
+  logout,
+  createSeedAdmin,
+  cleanupPhones,
+} from "./helpers"
 
 /**
  * Opens the "إضافة" dialog and fills the account form.
@@ -101,29 +36,17 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
   const createdPhones: string[] = []
 
   test.beforeAll(async () => {
-    admin = createSupabaseClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    admin = createSupabaseAdmin()
     adminSeed = await createSeedAdmin(admin, "ADMIN", randomPhone(), "testadmin123")
     superSeed = await createSeedAdmin(admin, "SUPER_ADMIN", randomPhone(), "testadmin123")
   })
 
   test.afterAll(async () => {
-    const allPhones = [
-      ...createdPhones.map(normalizePhone),
+    await cleanupPhones(admin, [
+      ...createdPhones,
       adminSeed.phone,
       superSeed.phone,
-    ]
-    for (const phone of allPhones) {
-      const { data } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("phone", phone)
-        .maybeSingle()
-      if (data) {
-        await admin.auth.admin.deleteUser(data.id)
-      }
-    }
+    ])
   })
 
   test("20. Admin can add a مخدوم manually (+ إضافة مخدوم)", async ({ page }) => {

@@ -5,7 +5,10 @@ import { getProfile } from "@/services/profile-service"
 import { ROLES, type AppRole } from "@/lib/roles"
 import { UsersList } from "@/components/app/users-list"
 import { AddUserButton } from "@/components/app/add-user-button"
+import { AddPrivilegedUserButton } from "@/components/app/add-privileged-user-button"
 import { adminUpdateStatusAction } from "@/app/actions/profile"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
+import { loadMoreUsersAction } from "@/app/actions/listing"
 
 export const metadata: Metadata = { title: "المستخدمين" }
 
@@ -14,11 +17,12 @@ export default async function SuperAdminUsersPage() {
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SUPER_ADMIN) redirect("/")
 
-  const { data } = await supabase
+  const { data, count } = await supabase
     .from("profiles")
-    .select("id, full_name, phone, role, status")
+    .select("id, full_name, phone, role, status", { count: "exact" })
     .order("full_name", { ascending: true })
-    .limit(500)
+    .order("id")
+    .range(0, LIST_PAGE_SIZE - 1)
 
   const users = (data ?? []) as unknown as {
     id: string
@@ -33,15 +37,21 @@ export default async function SuperAdminUsersPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-xl font-extrabold">المستخدمين</h1>
-          <p className="text-sm text-muted-foreground">كل حسابات الخدمة — مخدومين وخدام ومسؤولين</p>
+          <p className="text-sm text-muted-foreground">
+            كل حسابات الخدمة — {count ?? users.length} مستخدم
+          </p>
         </div>
-        <AddUserButton defaultRole="SERVED_MEMBER" />
+        <div className="flex items-center gap-2">
+          <AddPrivilegedUserButton />
+          <AddUserButton defaultRole="SERVED_MEMBER" />
+        </div>
       </div>
 
       <UsersList
         users={users}
         homePrefix="/app/super-admin"
         onToggleStatus={adminUpdateStatusAction}
+        loadMore={loadMoreUsersAction}
       />
     </div>
   )

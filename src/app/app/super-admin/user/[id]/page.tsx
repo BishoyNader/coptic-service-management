@@ -1,12 +1,14 @@
 import type { Metadata } from "next"
 import { redirect, notFound } from "next/navigation"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, KeyRound } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile, getProfileById } from "@/services/profile-service"
 import { ROLES, ROLE_LABELS } from "@/lib/roles"
 import { AdminMemberView } from "@/components/app/admin-member-view"
+import { ResetPasswordButton } from "@/components/app/reset-password-button"
 import { adminUpdateProfileAction, adminUpdateStatusAction } from "@/app/actions/profile"
+import { NileDivider } from "@/components/coptic/brand"
 
 export const metadata: Metadata = { title: "عرض مستخدم" }
 
@@ -55,7 +57,7 @@ export default async function SuperAdminUserDetailPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <Link
           href="/app/super-admin/users"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -63,9 +65,12 @@ export default async function SuperAdminUserDetailPage({
           <ArrowRight className="size-4" />
           رجوع للمستخدمين
         </Link>
-        <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold text-muted-foreground">
-          {ROLE_LABELS[profile.role]}
-        </span>
+        <div className="flex items-center gap-2">
+          <ResetPasswordButton userId={profile.id} fullName={profile.full_name} />
+          <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold text-muted-foreground">
+            {ROLE_LABELS[profile.role]}
+          </span>
+        </div>
       </div>
 
       <AdminMemberView
@@ -77,6 +82,12 @@ export default async function SuperAdminUserDetailPage({
         onSubmit={adminUpdateProfileAction}
         onChangeStatus={adminUpdateStatusAction}
       />
+
+      <div className="flex items-center justify-center gap-2 rounded-2xl bg-card/60 py-3 text-xs text-muted-foreground">
+        <KeyRound className="size-4" />
+        الحسابات اللي من غير إيميل توصلهم إعادة تعيين كلمة المرور عن طريق مسؤول الخدمة العام
+      </div>
+      <NileDivider className="mx-auto w-2/3" />
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ChevronLeft, Loader2, Trash2 } from "lucide-react"
+import { Search, ChevronLeft, Loader2, Trash2, Plus } from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
 import { ATTENDANCE_TYPE_LABELS, ATTENDANCE_SOURCE_LABELS } from "@/lib/constants"
@@ -14,6 +14,7 @@ import type {
   AttendanceType,
 } from "@/lib/types"
 import { correctAttendanceAction } from "@/app/actions/attendance"
+import { ATTENDANCE_PAGE_SIZE } from "@/lib/pagination"
 import {
   Dialog,
   DialogContent,
@@ -48,20 +49,45 @@ export type AttendanceRow = {
 
 type AttendanceManagementProps = {
   records: AttendanceRow[]
+  /** When provided, renders a "عرض المزيد" button that loads the next page. */
+  loadMore?: (
+    offset: number
+  ) => Promise<{ ok: boolean; records: AttendanceRow[]; message?: string }>
 }
 
-export function AttendanceManagement({ records }: AttendanceManagementProps) {
+/** Merges a fresh server page into the loaded list, keeping appended rows. */
+function mergeAttendanceById(
+  prev: AttendanceRow[],
+  incoming: AttendanceRow[]
+): AttendanceRow[] {
+  const serverMap = new Map(incoming.map((r) => [r.id, r]))
+  const merged = prev.map((r) => serverMap.get(r.id) ?? r)
+  for (const r of incoming) {
+    if (!merged.some((x) => x.id === r.id)) merged.push(r)
+  }
+  return merged
+}
+
+export function AttendanceManagement({ records, loadMore }: AttendanceManagementProps) {
   const router = useRouter()
+  const [items, setItems] = useState(records)
+  const [prevRecords, setPrevRecords] = useState(records)
+  if (records !== prevRecords) {
+    setPrevRecords(records)
+    setItems((prev) => mergeAttendanceById(prev, records))
+  }
   const [date, setDate] = useState("")
   const [typeFilter, setTypeFilter] = useState<"ALL" | AttendanceType>("ALL")
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<AttendanceRow | null>(null)
   const [confirmVoid, setConfirmVoid] = useState(false)
   const [pending, setPending] = useState(false)
+  const [pendingMore, setPendingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(records.length === ATTENDANCE_PAGE_SIZE)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return records
+    return items
       .filter((r) => {
         if (date && cairoDateString(new Date(r.attended_at)) !== date) return false
         if (typeFilter !== "ALL" && r.type !== typeFilter) return false
@@ -69,11 +95,29 @@ export function AttendanceManagement({ records }: AttendanceManagementProps) {
         return true
       })
       .sort((a, b) => b.attended_at.localeCompare(a.attended_at))
-  }, [records, date, typeFilter, query])
+  }, [items, date, typeFilter, query])
 
-  const todayCount = records.filter(
+  const todayCount = items.filter(
     (r) => cairoDateString(new Date(r.attended_at)) === cairoDateString(new Date())
   ).length
+
+  const handleLoadMore = async () => {
+    if (!loadMore || pendingMore) return
+    setPendingMore(true)
+    const result = await loadMore(items.length)
+    setPendingMore(false)
+    if (result.ok) {
+      if (result.records.length > 0) {
+        setItems((prev) => {
+          const seen = new Set(prev.map((r) => r.id))
+          return [...prev, ...result.records.filter((r) => !seen.has(r.id))]
+        })
+      }
+      setHasMore(result.records.length === ATTENDANCE_PAGE_SIZE)
+    } else {
+      toast.error(result.message || "حدث خطأ أثناء التحميل")
+    }
+  }
 
   const applyChange = async (change: { type?: AttendanceType } | { voided: true }) => {
     if (!selected) return
@@ -217,6 +261,21 @@ export function AttendanceManagement({ records }: AttendanceManagementProps) {
               </tbody>
             </table>
           </div>
+
+          {loadMore ? (
+            <div className="flex justify-center pt-1">
+              {hasMore ? (
+                <Button variant="outline" onClick={handleLoadMore} disabled={pendingMore}>
+                  {pendingMore ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                  {pendingMore ? "جاري التحميل..." : "عرض المزيد"}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </>
       )}
 

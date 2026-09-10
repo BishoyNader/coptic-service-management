@@ -33,6 +33,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/app/admin/scores", label: "الدرجات", icon: "star" },
   { href: "/app/admin/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
+  { href: "/app/admin/account", label: "حسابي", icon: "user" },
 ]
 
 export const SUPER_ADMIN_NAV: NavItem[] = [
@@ -47,6 +48,7 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin/users", label: "المستخدمين", icon: "shield" },
   { href: "/app/super-admin/audit-log", label: "سجل العمليات", icon: "history" },
   { href: "/app/super-admin/settings", label: "الإعدادات", icon: "settings" },
+  { href: "/app/super-admin/account", label: "حسابي", icon: "user" },
 ]
 
 export function navForRole(role: AppRole): NavItem[] {
