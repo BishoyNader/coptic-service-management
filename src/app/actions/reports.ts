@@ -14,11 +14,12 @@ import {
 } from "@/services/reports-service"
 
 /**
- * Reports are SUPER_ADMIN only. The actor is re-verified inside every action
- * from the session (never from anything the browser forwards); reports read
- * through the authenticated client so RLS still applies.
+ * Reports are accessible to ADMIN and SUPER_ADMIN.
+ * The actor is re-verified inside every action from the session (never from
+ * anything the browser forwards); reports read through the authenticated
+ * client so RLS still applies.
  */
-async function requireSuperAdmin(): Promise<{ supabase: SupabaseServerClient; actorId: string } | null> {
+async function requireAdmin(): Promise<{ supabase: SupabaseServerClient; actorId: string } | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -31,7 +32,7 @@ async function requireSuperAdmin(): Promise<{ supabase: SupabaseServerClient; ac
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || profile.role !== ROLES.SUPER_ADMIN) return null
+  if (!profile || (profile.role !== ROLES.SUPER_ADMIN && profile.role !== ROLES.ADMIN)) return null
   return { supabase, actorId: user.id }
 }
 
@@ -42,7 +43,7 @@ export type ReportActionResult<T> =
 export async function getAttendanceReportAction(
   range: unknown
 ): Promise<ReportActionResult<AttendanceReport>> {
-  const actor = await requireSuperAdmin()
+  const actor = await requireAdmin()
   if (!actor) return { ok: false, message: "غير مصرح" }
 
   let rangeValue
@@ -58,7 +59,7 @@ export async function getAttendanceReportAction(
 export async function getScoresReportAction(
   range: unknown
 ): Promise<ReportActionResult<ScoresReport>> {
-  const actor = await requireSuperAdmin()
+  const actor = await requireAdmin()
   if (!actor) return { ok: false, message: "غير مصرح" }
 
   let rangeValue
@@ -74,7 +75,7 @@ export async function getScoresReportAction(
 export async function getActivitiesReportAction(
   range: unknown
 ): Promise<ReportActionResult<ActivitiesReport>> {
-  const actor = await requireSuperAdmin()
+  const actor = await requireAdmin()
   if (!actor) return { ok: false, message: "غير مصرح" }
 
   let rangeValue

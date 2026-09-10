@@ -1,15 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { CalendarSearch, Church, Flame, Loader2, ScanLine } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { getAttendanceReportAction } from "@/app/actions/reports"
+import { exportAttendanceReportAction } from "@/app/actions/exports"
 import type { AttendanceReport } from "@/services/reports-service"
 import { ROLE_LABELS, type AppRole } from "@/lib/roles"
 import { addDaysDate } from "@/services/scoring-rules"
 import { cairoDateString } from "@/lib/cairo"
+import { ExportButton } from "./export-button"
 
 const SOURCE_LABELS: Record<"QR" | "CODE" | "MANUAL", string> = {
   QR: "QR",
@@ -87,10 +89,13 @@ export function AttendanceReportPanel() {
   const [resolved, setResolved] = useState({ from: addDaysDate(today(), -30), to: today() })
   const [report, setReport] = useState<AttendanceReport | null>(null)
   const [loading, setLoading] = useState(true)
+  const requestIdRef = useRef(0)
 
   const load = useCallback(async (from: string, to: string) => {
+    const requestId = ++requestIdRef.current
     setLoading(true)
     const res = await getAttendanceReportAction({ from, to })
+    if (requestId !== requestIdRef.current) return
     setLoading(false)
     if (res.ok) setReport(res.data)
     else toast.error(res.message)
@@ -118,6 +123,15 @@ export function AttendanceReportPanel() {
         label="آخر 30 يوم افتراضيًا"
         panel="attendance-report"
       />
+
+      {!loading && report && report.rows.length > 0 ? (
+        <div className="flex justify-end">
+          <ExportButton
+            action={() => exportAttendanceReportAction({ from: resolved.from, to: resolved.to })}
+            label="تصدير CSV"
+          />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-card/60 px-4 py-8 text-sm text-muted-foreground">

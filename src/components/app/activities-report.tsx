@@ -1,14 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { CalendarCheck2, Loader2, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { getActivitiesReportAction } from "@/app/actions/reports"
+import { exportActivitiesReportAction } from "@/app/actions/exports"
 import type { ActivitiesReport } from "@/services/reports-service"
 import { addDaysDate } from "@/services/scoring-rules"
 import { cairoDateString } from "@/lib/cairo"
+import { ExportButton } from "./export-button"
 
 export function ActivitiesReportPanel() {
   const today = () => cairoDateString(new Date())
@@ -17,10 +19,13 @@ export function ActivitiesReportPanel() {
   const [resolved, setResolved] = useState({ from: addDaysDate(today(), -30), to: today() })
   const [report, setReport] = useState<ActivitiesReport | null>(null)
   const [loading, setLoading] = useState(true)
+  const requestIdRef = useRef(0)
 
   const load = useCallback(async (from: string, to: string) => {
+    const requestId = ++requestIdRef.current
     setLoading(true)
     const res = await getActivitiesReportAction({ from, to })
+    if (requestId !== requestIdRef.current) return
     setLoading(false)
     if (res.ok) setReport(res.data)
     else toast.error(res.message)
@@ -65,6 +70,15 @@ export function ActivitiesReportPanel() {
         </Button>
         <span className="ms-auto text-[11px] text-muted-foreground">آخر 30 يوم افتراضيًا</span>
       </div>
+
+      {!loading && report && report.byActivity.length > 0 ? (
+        <div className="flex justify-end">
+          <ExportButton
+            action={() => exportActivitiesReportAction({ from: resolved.from, to: resolved.to })}
+            label="تصدير CSV"
+          />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-card/60 px-4 py-8 text-sm text-muted-foreground">

@@ -1,10 +1,10 @@
 /**
- * Phase 5C — read-only reporting aggregations for Super Admin.
+ * Phase 5C/8 — read-only reporting aggregations for Admin & Super Admin.
  *
  * Reports never mutate data. Every aggregation runs against the
  * authenticated (RLS-bound) Supabase client, so reads stay constrained by
  * the same security policies the rest of the app uses; the calling page or
- * server action has already verified the actor is a SUPER_ADMIN.
+ * server action has already verified the actor is an admin.
  *
  * All windows are Cairo wall dates in the "YYYY-MM-DD" vocabulary the scoring
  * engine uses.
@@ -23,10 +23,25 @@ export function isDateString(value: unknown): value is string {
   return typeof value === "string" && DATE_RE.test(value)
 }
 
+/** True when "YYYY-MM-DD" is a real calendar date (rejects e.g. 02-30). */
+export function isRealDate(value: string): boolean {
+  if (!isDateString(value)) return false
+  const [y, m, d] = value.split("-").map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return (
+    dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+  )
+}
+
 /** Parses + validates an external report range; throws a UI-safe message. */
 export function validateRange(value: unknown): ReportRange {
   const v = (value ?? {}) as Record<string, unknown>
-  if (!isDateString(v.from) || !isDateString(v.to)) {
+  if (
+    !isDateString(v.from) ||
+    !isDateString(v.to) ||
+    !isRealDate(v.from) ||
+    !isRealDate(v.to)
+  ) {
     throw new Error("نطاق التاريخ غير صحيح")
   }
   if (v.from > v.to) throw new Error("تاريخ البداية بعد تاريخ النهاية")
@@ -144,6 +159,7 @@ export async function buildScoresReport(
     .eq("is_voided", false)
     .gte("session_date", from)
     .lte("session_date", to)
+    .limit(5000)
 
   const byName = new Map<string, ScoreReportRow>()
   const categoryTotals: Partial<Record<ScoringCategory, number>> = {}
@@ -218,6 +234,7 @@ export async function buildActivitiesReport(
     )
     .gte("recorded_on", from)
     .lte("recorded_on", to)
+    .limit(5000)
 
   const activities = new Map<string, ActivityReportActivityRow>()
   const byName = new Map<string, ActivityReportServantRow>()

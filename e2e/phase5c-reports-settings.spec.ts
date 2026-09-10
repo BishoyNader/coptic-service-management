@@ -64,12 +64,7 @@ async function login(page: Page, phone: string, password: string) {
 }
 
 async function setDateInput(page: Page, testId: string, value: string) {
-  await page.getByTestId(testId).evaluate((el, v) => {
-    const input = el as HTMLInputElement
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, v)
-    input.dispatchEvent(new Event("input", { bubbles: true }))
-    input.dispatchEvent(new Event("change", { bubbles: true }))
-  }, value)
+  await page.getByTestId(testId).fill(value)
   await expect(page.getByTestId(testId)).toHaveValue(value)
 }
 
@@ -572,6 +567,12 @@ test.describe("PHASE 5C — Reports & Settings", () => {
     }) => {
       await login(page, superSeed.phone, superSeed.password)
       await page.goto("/app/super-admin/reports")
+
+      // Wait for the initial report to finish loading (a post-hydration
+      // effect) before driving the date inputs — interactions issued before
+      // React hydration completes can be swallowed and reset the controlled
+      // value. Waiting on the loaded stats guarantees the controls are live.
+      await expect(page.getByText("إجمالي الحضور")).toBeVisible()
 
       const yesterday = addDaysDate(cairoDateString(new Date()), -1)
       await setDateInput(page, "attendance-report-from", yesterday)

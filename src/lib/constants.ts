@@ -33,6 +33,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/app/admin/scores", label: "الدرجات", icon: "star" },
   { href: "/app/admin/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
+  { href: "/app/admin/reports", label: "التقارير", icon: "chart" },
   { href: "/app/admin/account", label: "حسابي", icon: "user" },
 ]
 

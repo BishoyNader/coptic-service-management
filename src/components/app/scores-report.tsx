@@ -1,15 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { BarChart3, Crown, Loader2, Star } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { getScoresReportAction } from "@/app/actions/reports"
+import { exportScoresReportAction } from "@/app/actions/exports"
 import type { ScoresReport } from "@/services/reports-service"
 import { ROLE_LABELS, type AppRole } from "@/lib/roles"
 import { SCORING_CATEGORY_LABELS, type ScoringCategory } from "@/lib/constants"
 import { periodForDate, type ScorePeriod } from "@/services/scoring-rules"
+import { ExportButton } from "./export-button"
 
 function ScoresRangePicker({
   month,
@@ -71,10 +73,13 @@ export function ScoresReportPanel() {
   })
   const [report, setReport] = useState<ScoresReport | null>(null)
   const [loading, setLoading] = useState(true)
+  const requestIdRef = useRef(0)
 
   const load = useCallback(async (from: string, to: string) => {
+    const requestId = ++requestIdRef.current
     setLoading(true)
     const res = await getScoresReportAction({ from, to })
+    if (requestId !== requestIdRef.current) return
     setLoading(false)
     if (res.ok) setReport(res.data)
     else toast.error(res.message)
@@ -101,6 +106,15 @@ export function ScoresReportPanel() {
         onApply={() => setResolved({ from, to })}
         loading={loading}
       />
+
+      {!loading && report && report.rows.length > 0 ? (
+        <div className="flex justify-end">
+          <ExportButton
+            action={() => exportScoresReportAction({ from: resolved.from, to: resolved.to })}
+            label="تصدير CSV"
+          />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-card/60 px-4 py-8 text-sm text-muted-foreground">

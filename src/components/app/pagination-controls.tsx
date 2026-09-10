@@ -7,6 +7,24 @@ type PaginationControlsProps = {
   page: number
   totalPages: number
   total: number
+  /** Extra query params to preserve across page links (e.g. search). */
+  searchParams?: Record<string, string>
+}
+
+function buildHref(
+  pathname: string,
+  page: number,
+  searchParams?: Record<string, string>,
+): string {
+  const params = new URLSearchParams()
+  if (page > 1) params.set("page", String(page))
+  if (searchParams) {
+    for (const [k, v] of Object.entries(searchParams)) {
+      if (v) params.set(k, v)
+    }
+  }
+  const qs = params.toString()
+  return qs ? `${pathname}?${qs}` : pathname
 }
 
 /**
@@ -18,6 +36,7 @@ export function PaginationControls({
   page,
   totalPages,
   total,
+  searchParams,
 }: PaginationControlsProps) {
   if (totalPages <= 1) return null
 
@@ -26,7 +45,7 @@ export function PaginationControls({
       <p className="text-xs text-muted-foreground">إجمالي {total}</p>
       <div className="flex items-center gap-2">
         {page > 1 ? (
-          <Link href={page > 2 ? `${pathname}?page=${page - 1}` : pathname}>
+          <Link href={buildHref(pathname, page - 1, searchParams)}>
             <Button variant="outline" className="h-9 gap-1">
               <ChevronRight className="size-4" />
               السابق
@@ -44,7 +63,7 @@ export function PaginationControls({
         </span>
 
         {page < totalPages ? (
-          <Link href={`${pathname}?page=${page + 1}`}>
+          <Link href={buildHref(pathname, page + 1, searchParams)}>
             <Button variant="outline" className="h-9 gap-1">
               التالي
               <ChevronLeft className="size-4" />

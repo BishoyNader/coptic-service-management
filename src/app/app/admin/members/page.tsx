@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { Users, Phone, ChevronLeft } from "lucide-react"
+import { Users, Phone, ChevronLeft, Search } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
@@ -9,13 +9,15 @@ import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AddMemberButton } from "@/components/app/add-member-button"
 import { PaginationControls } from "@/components/app/pagination-controls"
+import { ExportButton } from "@/components/app/export-button"
+import { exportMembersAction } from "@/app/actions/exports"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
 export default async function AdminMembersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; q?: string }>
 }) {
   const supabase = await createClient()
   const profile = await getProfile(supabase)
@@ -26,17 +28,25 @@ export default async function AdminMembersPage({
   const page = Math.max(1, rawPage)
   const from = (page - 1) * LIST_PAGE_SIZE
   const to = from + LIST_PAGE_SIZE - 1
+  const q = (sp.q ?? "").trim()
 
-  const { data: members, count } = await supabase
+  let query = supabase
     .from("profiles")
     .select("id, full_name, phone, status", { count: "exact" })
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
     .order("id")
-    .range(from, to)
+
+  if (q) {
+    query = query.ilike("full_name", `%${q}%`)
+  }
+
+  const { data: members, count } = await query.range(from, to)
 
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE))
+  const activeSearchParams: Record<string, string> = {}
+  if (q) activeSearchParams.q = q
 
   return (
     <div className="space-y-4">
@@ -45,15 +55,30 @@ export default async function AdminMembersPage({
           <h1 className="font-heading text-xl font-extrabold">المخدومين</h1>
           <p className="text-sm text-muted-foreground">{total} مخدوم</p>
         </div>
-        <AddMemberButton />
+        <div className="flex items-center gap-2">
+          <ExportButton action={exportMembersAction} label="تصدير CSV" />
+          <AddMemberButton />
+        </div>
       </div>
+
+      <form method="get" className="relative">
+        <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          name="q"
+          defaultValue={q}
+          placeholder="ابحث بالاسم..."
+          className="h-11 w-full rounded-xl border border-input bg-transparent ps-10 pe-4 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+        />
+        <input type="hidden" name="page" value="" />
+      </form>
 
       {!members || members.length === 0 ? (
         <EmptyState
           icon={<Users className="size-7" />}
-          title="لا يوجد مخدومين حتى الآن"
-          description="لما تسجّل أو تضيف أول مخدوم، هيظهر هنا"
-          action={<AddMemberButton />}
+          title={q ? "لا توجد نتائج" : "لا يوجد مخدومين حتى الآن"}
+          description={q ? "جرّب كلمة بحث مختلفة" : "لما تسجّل أو تضيف أول مخدوم، هيظهر هنا"}
+          action={!q ? <AddMemberButton /> : undefined}
         />
       ) : (
         <>
@@ -84,6 +109,7 @@ export default async function AdminMembersPage({
             page={page}
             totalPages={totalPages}
             total={total}
+            searchParams={activeSearchParams}
           />
         </>
       )}
