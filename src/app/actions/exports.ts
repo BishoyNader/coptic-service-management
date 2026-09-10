@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import type { SupabaseServerClient } from "@/lib/supabase/server"
 import { ROLES } from "@/lib/roles"
 import { validateRange, type ReportRange } from "@/services/reports-service"
+import { consumeRateLimit, exportKey, ratePolicy } from "@/lib/rate-limit"
 
 const REPORT_EXPORT_LIMIT = 5000
 const MEMBERS_EXPORT_LIMIT = 5000
@@ -27,6 +28,15 @@ async function requireAdmin(): Promise<SupabaseServerClient | null> {
     .maybeSingle()
 
   if (!profile || (profile.role !== ROLES.SUPER_ADMIN && profile.role !== ROLES.ADMIN)) return null
+
+  // Per-admin CSV download budget (~12/h) so repeated exports cannot slam
+  // the database or be abused by a compromised account.
+  const allowed = await consumeRateLimit(
+    exportKey(user.id),
+    ratePolicy("exportPerAdmin")
+  )
+  if (!allowed) return null
+
   return supabase
 }
 

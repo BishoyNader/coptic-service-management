@@ -15,6 +15,7 @@ import {
 } from "@/services/notification-service"
 import type { DeliveryChannel } from "@/services/notification-delivery"
 import { isUuid } from "@/lib/validation"
+import { consumeRateLimit, notifyKey, ratePolicy } from "@/lib/rate-limit"
 
 async function requireAdminActor(): Promise<{ adminId: string; role: AppRole } | null> {
   const supabase = await createClient()
@@ -30,6 +31,14 @@ async function requireAdminActor(): Promise<{ adminId: string; role: AppRole } |
     .maybeSingle()
 
   if (!profile || !isAdminRole(profile.role)) return null
+
+  // Per-admin broadcast budget (~60/h) protects external-channel spend.
+  const allowed = await consumeRateLimit(
+    notifyKey(user.id),
+    ratePolicy("notifyPerAdmin")
+  )
+  if (!allowed) return null
+
   return { adminId: user.id, role: profile.role as AppRole }
 }
 

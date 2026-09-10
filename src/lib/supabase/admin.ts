@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { assertSupabaseConnection } from "@/lib/env"
 
 /**
  * Service-role Supabase client. Server-only.
@@ -8,6 +9,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
  * never be exposed to the browser.
  */
 export function createAdminClient() {
+  assertSupabaseConnection()
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

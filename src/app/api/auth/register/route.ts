@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { registerUser } from "@/services/register-service"
 import { validateRegistration, normalizePhone } from "@/lib/validation"
+import { consumeRateLimit, clientIpFromRequest, ratePolicy, registerKey, isLoopback } from "@/lib/rate-limit"
 import type { RegistrationPayload } from "@/lib/types"
 
 /**
@@ -10,6 +11,7 @@ import type { RegistrationPayload } from "@/lib/types"
  *
  * Requires SUPABASE_SERVICE_ROLE_KEY server-side. The response never
  * contains the password, and user creation happens inside Supabase Auth.
+ * Abuse is throttled per source address via the DB-backed limiter.
  */
 export async function POST(request: Request) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -17,6 +19,23 @@ export async function POST(request: Request) {
       { ok: false, message: "الخدمة غير متاحة الآن" },
       { status: 500 }
     )
+  }
+
+  // Per-address budget BEFORE any parsing work (~8/h). Counts every attempt,
+  // valid or not, which is what makes it effective against dribble abuse.
+  // Local loopback traffic is exempt so development/e2e stays frictionless.
+  const ip = clientIpFromRequest(request)
+  if (!isLoopback(ip)) {
+    const allowed = await consumeRateLimit(
+      registerKey(ip),
+      ratePolicy("registerPerIp")
+    )
+    if (!allowed) {
+      return NextResponse.json(
+        { ok: false, message: "عدد كبير من محاولات التسجيل — حاول مرة أخرى بعد فترة" },
+        { status: 429 }
+      )
+    }
   }
 
   let body: unknown

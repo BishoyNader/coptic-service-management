@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: Typecheck · Lint · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+        env:
+          # Public placeholders satisfy the compiler/build; real values are
+          # supplied at runtime in the deployed environment / e2e job.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci_placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ""
+      - name: Audit
+        run: npm audit --audit-level=high
+
+  e2e:
+    name: E2E (local Supabase stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Start Supabase stack
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - name: Extract stack env
+        id: env
+        run: |
+          supabase status > /tmp/sb.txt
+          URL=$(supabase status --output json | jq -r .API_URL)
+          ANON=$(supabase status --output json | jq -r .ANON_KEY)
+          SECRET=$(supabase status --output json | jq -r .SERVICE_ROLE_KEY)
+          printf 'NEXT_PUBLIC_SUPABASE_URL=%s\nNEXT_PUBLIC_SUPABASE_ANON_KEY=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\nCRON_SECRET=ci-cron-secret\n' \
+            "$URL" "$ANON" "$SECRET" > .env.local
+      - name: Start Next dev server
+        run: |
+          set -e
+          npm run dev > /tmp/next.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/login > /dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:3000/login > /dev/null
+      - name: Run E2E suite
+        run: npx playwright test --reporter=line
+      - name: Upload results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7

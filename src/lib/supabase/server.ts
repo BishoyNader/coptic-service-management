@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { assertSupabaseConnection } from "@/lib/env"
 
 /**
  * Server-side Supabase client authenticated as the current user via
@@ -7,6 +8,7 @@ import { cookies } from "next/headers"
  * Server Actions / Route Handlers where the user session is expected.
  */
 export async function createClient() {
+  assertSupabaseConnection()
   const cookieStore = await cookies()
 
   return createServerClient(

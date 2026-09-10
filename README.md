@@ -76,6 +76,14 @@ Full route map (from `npm run build`):
 - **Audit coverage on membership changes** — Status changes and profile edits by admins write `PROFILE_UPDATED` / status audit entries via the service-role path, keeping the audit trail consistent with Phase 3.
 - **Cairo-day attendance reports** — Attendance reports bound "today" by Cairo midnight (`cairoDayStart`/`cairoDayEnd`), so overnight sessions are counted on the correct Coptic calendar day in every timezone.
 
+## Production hardening (Phase 10)
+
+- **Fail-fast env guard** — In production the server refuses to boot-request without the required Supabase variables (`src/lib/env.ts`), so a mis-deploy is never silently degraded.
+- **DB-backed rate limiting** — Counters live in Postgres (`request_throttles` + service-role-only `consume_rate_limit`), so limits hold across serverless instances. Applied to public registration (8/h per IP), CSV exports (12/h per admin), and notification broadcasts (60/h per admin).
+- **Tightened RPC surface** — `birthdays_for_today()` (a SECURITY DEFINER that returns member phone numbers) is now EXECUTE-restricted to the service role; anon/authenticated clients are denied.
+- **Security headers** — CSP (Supabase-aware connect-src), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` (QR camera kept), HSTS.
+- **Deployment runbook** — See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the environment matrix, Vercel + Supabase setup, cron scheduling, backups/recovery, monitoring, and rollback. CI runs typecheck/lint/build (+ E2E against a fresh Supabase stack).
+
 ## Getting started
 
 ### 1. Install dependencies

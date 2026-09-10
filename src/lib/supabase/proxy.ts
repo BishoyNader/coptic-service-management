@@ -1,12 +1,14 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { assertSupabaseConnection } from "@/lib/env"
 
 /**
  * Supabase client factory for the request proxy. Uses the anonymous key only
  * and relies on RLS + auth cookies for security.
  */
 export async function updateSession(request: NextRequest) {
+  assertSupabaseConnection()
   let supabaseResponse = NextResponse.next({
     request,
   })
