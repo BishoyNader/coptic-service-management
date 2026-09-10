@@ -1,17 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Send } from "lucide-react"
 import { toast } from "sonner"
-import { sendNotificationAction } from "@/app/actions/notifications"
+import {
+  sendNotificationAction,
+  getDeliveryChannelsAction,
+} from "@/app/actions/notifications"
 import { NOTIFICATION_AUDIENCE_LABELS } from "@/lib/constants"
 import type { NotificationAudience } from "@/services/notification-service"
+import type { DeliveryChannel } from "@/services/notification-delivery"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+
+const CHANNEL_UI_LABELS: Record<DeliveryChannel, string> = {
+  IN_APP: "إشعار داخل التطبيق",
+  SMS: "رسالة SMS",
+  WHATSAPP: "رسالة WhatsApp",
+}
 
 export function NotificationComposer({
   allowedAudiences,
@@ -23,10 +33,25 @@ export function NotificationComposer({
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
   const [sending, setSending] = useState(false)
+  const [channels, setChannels] = useState<
+    Array<{ channel: DeliveryChannel; configured: boolean; label: string }>
+  >([])
+  const [selectedChannels, setSelectedChannels] = useState<DeliveryChannel[]>(["IN_APP"])
+
+  useEffect(() => {
+    getDeliveryChannelsAction().then(setChannels).catch(() => {})
+  }, [])
 
   const toggle = (audience: NotificationAudience) => {
     setSelected((prev) =>
       prev.includes(audience) ? prev.filter((a) => a !== audience) : [...prev, audience]
+    )
+  }
+
+  const toggleChannel = (channel: DeliveryChannel) => {
+    if (channel === "IN_APP") return // always on
+    setSelectedChannels((prev) =>
+      prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel]
     )
   }
 
@@ -48,7 +73,12 @@ export function NotificationComposer({
     }
 
     setSending(true)
-    const res = await sendNotificationAction({ title: t, body: b, audiences: selected })
+    const res = await sendNotificationAction({
+      title: t,
+      body: b,
+      audiences: selected,
+      channels: selectedChannels,
+    })
     setSending(false)
 
     if (!res.ok) {
@@ -60,12 +90,27 @@ export function NotificationComposer({
     if (res.recipientCount > 0) {
       toast.info(`تم الإرسال إلى ${res.recipientCount} شخصًا`)
     }
+
+    // Show delivery summary if external channels were used
+    if (res.deliverySummary) {
+      const { sms, whatsapp } = res.deliverySummary
+      if (sms.sent > 0) toast.info(`تم إرسال ${sms.sent} رسالة SMS`)
+      if (sms.failed > 0) toast.warning(`فشل إرسال ${sms.failed} رسالة SMS`)
+      if (sms.notConfigured > 0) toast.info("خدمة SMS غير مُعدة")
+      if (whatsapp.sent > 0) toast.info(`تم إرسال ${whatsapp.sent} رسالة WhatsApp`)
+      if (whatsapp.failed > 0) toast.warning(`فشل إرسال ${whatsapp.failed} رسالة WhatsApp`)
+      if (whatsapp.notConfigured > 0) toast.info("خدمة WhatsApp غير مُعدة")
+    }
+
     setTitle("")
     setBody("")
     setSelected([])
+    setSelectedChannels(["IN_APP"])
     window.dispatchEvent(new Event("notifications-updated"))
     router.refresh()
   }
+
+  const externalChannels = channels.filter((c) => c.channel !== "IN_APP")
 
   return (
     <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
@@ -88,6 +133,33 @@ export function NotificationComposer({
           ))}
         </div>
       </div>
+
+      {externalChannels.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <Label>قنوات الإرسال</Label>
+          <div className="flex flex-wrap gap-4 pb-1">
+            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium has-[[data-checked]]:border-coptic-teal has-[[data-checked]]:bg-coptic-teal/10">
+              <Checkbox checked={true} disabled />
+              {CHANNEL_UI_LABELS.IN_APP}
+            </label>
+            {externalChannels.map((ch) => (
+              <label
+                key={ch.channel}
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium has-[[data-checked]]:border-coptic-teal has-[[data-checked]]:bg-coptic-teal/10"
+              >
+                <Checkbox
+                  checked={selectedChannels.includes(ch.channel)}
+                  onCheckedChange={() => toggleChannel(ch.channel)}
+                />
+                <span>{CHANNEL_UI_LABELS[ch.channel]}</span>
+                {!ch.configured && (
+                  <span className="text-[10px] text-muted-foreground">(غير مُعدة)</span>
+                )}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 space-y-1">
         <Label htmlFor="notification-title">العنوان</Label>

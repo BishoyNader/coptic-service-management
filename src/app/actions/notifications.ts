@@ -10,8 +10,10 @@ import {
   markNotificationRead,
   NOTIFICATION_MAX_BODY,
   NOTIFICATION_MAX_TITLE,
+  resolveRecipientIds,
   type NotificationAudience,
 } from "@/services/notification-service"
+import type { DeliveryChannel } from "@/services/notification-delivery"
 
 async function requireAdminActor(): Promise<{ adminId: string; role: AppRole } | null> {
   const supabase = await createClient()
@@ -30,19 +32,32 @@ async function requireAdminActor(): Promise<{ adminId: string; role: AppRole } |
   return { adminId: user.id, role: profile.role as AppRole }
 }
 
+type ChannelCounts = { sent: number; failed: number; notConfigured: number }
+
 export type SendNotificationResult =
-  | { ok: true; message: string; recipientCount: number }
+  | {
+      ok: true
+      message: string
+      recipientCount: number
+      deliverySummary?: {
+        sms: ChannelCounts
+        whatsapp: ChannelCounts
+      }
+    }
   | { ok: false; message: string }
 
 export type SendNotificationInput = {
   title: string
   body: string
   audiences: NotificationAudience[]
+  channels?: DeliveryChannel[]
 }
 
 /**
  * Admin / Super Admin: create a broadcast notification and fan out
  * recipients server-side. The audience is validated against the actor role.
+ * External delivery channels (SMS/WhatsApp) are optional and only used if
+ * the corresponding provider is configured.
  */
 export async function sendNotificationAction(
   input: SendNotificationInput
@@ -81,10 +96,48 @@ export async function sendNotificationAction(
   })
 
   if (!res.ok) return { ok: false, message: res.message }
+
+  // Trigger external delivery if channels beyond IN_APP are configured.
+  const requested = Array.isArray(input.channels) ? input.channels : []
+  const externalChannels = requested.filter((c) => c !== "IN_APP")
+  let deliverySummary:
+    | { sms: ChannelCounts; whatsapp: ChannelCounts }
+    | undefined
+
+  if (externalChannels.length > 0 && res.recipientCount > 0) {
+    const { getConfiguredChannelsSummary, deliverBatch } = await import(
+      "@/services/notification-delivery"
+    )
+
+    const available = await getConfiguredChannelsSummary()
+    const cleanChannels = externalChannels.filter((ch) =>
+      available.some((c) => c.channel === ch && c.configured)
+    )
+
+    if (cleanChannels.length > 0) {
+      const recipients = await resolveRecipientIds(admin, input.audiences)
+      try {
+        const batchResult = await deliverBatch(
+          admin,
+          recipients.map((r) => ({ profileId: r.id, phone: r.phone })),
+          cleanChannels,
+          { notificationId: res.notificationId, title, body }
+        )
+        deliverySummary = {
+          sms: batchResult.channelResults.SMS,
+          whatsapp: batchResult.channelResults.WHATSAPP,
+        }
+      } catch {
+        // External delivery failure must not break in-app notification
+      }
+    }
+  }
+
   return {
     ok: true,
     message: "تم إرسال الإشعار بنجاح ✓",
     recipientCount: res.recipientCount,
+    deliverySummary,
   }
 }
 
@@ -100,4 +153,14 @@ export async function markNotificationReadAction(
 export async function getUnreadCountAction(): Promise<{ count: number }> {
   const supabase = await createClient()
   return { count: await getUnreadCount(supabase) }
+}
+
+/** Server action: get configured delivery channels for the UI. */
+export async function getDeliveryChannelsAction(): Promise<
+  Array<{ channel: DeliveryChannel; configured: boolean; label: string }>
+> {
+  const { getConfiguredChannelsSummary } = await import(
+    "@/services/notification-delivery"
+  )
+  return getConfiguredChannelsSummary()
 }

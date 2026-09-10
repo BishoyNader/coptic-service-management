@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Cake, Send } from "lucide-react"
+import { Cake, Send, Play } from "lucide-react"
 import { toast } from "sonner"
 import { sendBirthdayGreetingAction } from "@/app/actions/birthdays"
+import { runBirthdayAutomationAction } from "@/app/actions/birthday-automation"
 import {
   BIRTHDAY_GREETING_TITLE,
   BIRTHDAY_WINDOW_DAYS,
@@ -34,10 +35,17 @@ type Draft = {
   body: string
 }
 
-export function BirthdayBoard({ rows }: { rows: UpcomingBirthday[] }) {
+export function BirthdayBoard({
+  rows,
+  showAutomationButton = false,
+}: {
+  rows: UpcomingBirthday[]
+  showAutomationButton?: boolean
+}) {
   const router = useRouter()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [busy, setBusy] = useState(false)
+  const [autoBusy, setAutoBusy] = useState(false)
 
   const openDraft = (r: UpcomingBirthday) =>
     setDraft({
@@ -83,13 +91,76 @@ export function BirthdayBoard({ rows }: { rows: UpcomingBirthday[] }) {
     router.refresh()
   }
 
-  if (rows.length === 0) {
+  const handleRunAutomation = async () => {
+    setAutoBusy(true)
+    const res = await runBirthdayAutomationAction()
+    setAutoBusy(false)
+
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+
+    const r = res.result
+    if (r.totalEligible === 0) {
+      toast.info("لا توجد أعياد ميلاد اليوم")
+    } else if (r.notificationsCreated > 0) {
+      toast.success(`تم إرسال ${r.notificationsCreated} تهنئة تلقائية`)
+      if (r.externalDeliveries.sms > 0) {
+        toast.info(`تم إرسال ${r.externalDeliveries.sms} رسالة SMS`)
+      }
+      if (r.externalDeliveries.whatsapp > 0) {
+        toast.info(`تم إرسال ${r.externalDeliveries.whatsapp} رسالة WhatsApp`)
+      }
+      if (r.skippedAlreadySent > 0) {
+        toast.info(`تم تخطي ${r.skippedAlreadySent} تهنئة مرسلة مسبقاً`)
+      }
+    } else if (r.skippedAlreadySent > 0) {
+      toast.info("جميع التهانئ مرسلة مسبقاً")
+    }
+
+    if (r.errors.length > 0) {
+      toast.error(`حدثت ${r.errors.length} أخطاء أثناء المعالجة`)
+    }
+
+    window.dispatchEvent(new Event("notifications-updated"))
+    router.refresh()
+  }
+
+  if (rows.length === 0 && !showAutomationButton) {
     return (
       <EmptyState
         icon={<Cake className="size-7" />}
         title="لا توجد أعياد قريبة"
         description="أعياد الميلاد اللي في خلال 30 يوم هتظهر هنا"
       />
+    )
+  }
+
+  if (rows.length === 0 && showAutomationButton) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleRunAutomation()}
+            disabled={autoBusy}
+            className="gap-2"
+          >
+            <Play className="size-4" />
+            {autoBusy ? "جارٍ التشغيل…" : "تشغيل التهنئة التلقائية"}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            تشغيل تلقائي لأعياد الميلاد النهاردة
+          </span>
+        </div>
+        <EmptyState
+          icon={<Cake className="size-7" />}
+          title="لا توجد أعياد قريبة"
+          description="أعياد الميلاد اللي في خلال 30 يوم هتظهر هنا"
+        />
+      </div>
     )
   }
 
@@ -109,6 +180,24 @@ export function BirthdayBoard({ rows }: { rows: UpcomingBirthday[] }) {
 
   return (
     <div className="space-y-6">
+      {showAutomationButton && (
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleRunAutomation()}
+            disabled={autoBusy}
+            className="gap-2"
+          >
+            <Play className="size-4" />
+            {autoBusy ? "جارٍ التشغيل…" : "تشغيل التهنئة التلقائية"}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            تشغيل تلقائي لأعياد الميلاد النهاردة
+          </span>
+        </div>
+      )}
+
       {sections.map((section) =>
         section.items.length === 0 ? null : (
           <section key={section.key} className="space-y-2">

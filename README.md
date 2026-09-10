@@ -32,6 +32,7 @@ Full route map (from `npm run build`):
 /app/admin/{members,members/[id],attendance,scores,birthdays,notifications}
 /app/super-admin/{users,user/[id],members,servants,attendance,scores,birthdays,audit-log,reports,settings,notifications}
 /api/auth/{register,set-session}
+/api/cron/birthdays
 ```
 
 ## What's built
@@ -40,8 +41,9 @@ Full route map (from `npm run build`):
 2. **Identity & QR** — personal 6-digit code + QR per served member (QR encodes a random UUID only; privileged accounts deliberately get **no** personal code/QR).
 3. **Attendance** — servant/admin QR check-in (server-side, RLS-enforced), attendance sessions with active/inactive state, manual entry for phone-only attendees, today’s records on each dashboard.
 4. **Scoring** — per-activity scores against seeded `scoring_rules`, point balances, member/activity score history, super-admin scoring-rules settings, empty states.
-5. **Operations** — attendance/scores reports (period-filtered), audit log, notification composer with per-role targeting (SMS provider stub — never actually sent), birthday list with greeting reminders, member/service management, admin reset-password per user.
+5. **Operations** — attendance/scores reports (period-filtered), audit log, notification composer with per-role targeting, multi-channel delivery (SMS/WhatsApp via Twilio), birthday list with greeting reminders, automated birthday job, member/service management, admin reset-password per user.
 6. **Account & access hardening** — see below.
+7. **Notification delivery & birthday automation** — see below.
 
 ## Access & account hardening (Phase 6)
 
@@ -51,6 +53,18 @@ Full route map (from `npm run build`):
 - **Password recovery (designed)** — email-only self-recovery; forgot-password returns one generic message for both email and phone (no account enumeration). The recovery link lands on `/auth/callback` (tokens arrive in the URL fragment, which server routes cannot read), the browser client posts them to `/api/auth/set-session`, and the user is taken to `/reset-password`. Admin-initiated reset (`admin.auth.admin.updateUserById`) is the universal path for phone-only accounts.
 - **Route protection** — `src/proxy.ts` enforces login and role segments; public prefixes are `/login`, `/register`, `/forgot-password`, `/reset-password`, `/auth/callback`. Authenticated users visiting the recovery pages are allowed through so a fresh recovery session can finish.
 - **Honest dashboards** — admin/super-admin homes show real aggregates (active members, today's attendance, upcoming birthdays, latest activity) and empty-state messages; no placeholder copy.
+
+## Notification delivery & birthday automation (Phase 7)
+
+- **Multi-channel delivery** — Provider abstraction (`NotificationProvider` interface) with `InAppProvider`, `SmsProvider` (Twilio), and `WhatsAppProvider` (Twilio). Business logic never knows which external provider is used.
+- **Channel selection** — Admins choose delivery channels explicitly (In-app + SMS + WhatsApp). Only configured channels are offered. In-app is always included.
+- **Delivery tracking** — `notification_deliveries` table records per-recipient per-channel status (QUEUED → SENT → DELIVERED, FAILED, PROVIDER_NOT_CONFIGURED). RLS: admin read/write only, users can read their own.
+- **Failure isolation** — External delivery failures never break in-app notifications. One recipient's failure never stops the batch. Per-recipient results are collected individually.
+- **Phone number safety** — Normalized at the server boundary. Not exposed unnecessarily. Not modified automatically.
+- **Birthday automation** — `birthdays_for_today()` SQL function + `runBirthdayAutomation()` service. Idempotent — unique constraint on `birthday_reminders` prevents duplicates. Runs via `GET /api/cron/birthdays?secret=CRON_SECRET` or manual admin trigger.
+- **Scheduled job** — Cron endpoint protected by `CRON_SECRET`. For production, configure an external scheduler (Vercel Cron, cron-job.org). For local dev, invoke manually via curl or the admin birthday page button.
+- **Delivery log** — Super Admin can view delivery records (notification, recipient, channel, status, attempted time, provider message ID, error). Tabbed UI on the notifications page.
+- **Birthday automation button** — Admin/Super Admin birthday pages include a "تشغيل التهنئة التلقائية" button for manual invocation during development.
 
 ## Getting started
 
@@ -93,6 +107,14 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
 
 The auth config enables phone-based password sign-in locally via a placeholder Twilio provider — no SMS is ever sent (users are created by the admin API and OTP flows are unused). `supabase/config.toml` already whitelists `http://localhost:3000`, `http://127.0.0.1:3000`, and `https://127.0.0.1:3000` as redirect URLs for the recovery email link.
 
+Optional: configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_SMS_FROM`, and `TWILIO_WHATSAPP_FROM` in `.env.local` for real SMS/WhatsApp delivery. Without these, all external delivery gracefully reports "not configured" and in-app notifications still work.
+
+Set `CRON_SECRET` to protect the birthday automation endpoint. For local testing, call it manually:
+
+```bash
+curl "http://localhost:3000/api/cron/birthdays?secret=YOUR_SECRET"
+```
+
 ### 4. Run the app
 
 ```bash
@@ -103,7 +125,7 @@ In development the recovery link must be opened on the same host the app runs on
 
 ## Testing
 
-End-to-end tests live in `e2e/` (`phase2`, `manual-crud`, `phase3` attendance, `phase4-scores`, `phase5/5b/5c` notifications + birthdays + reports/settings, `phase6-account-access`). A dev server and the Supabase stack are expected to be running.
+End-to-end tests live in `e2e/` (`phase2`, `manual-crud`, `phase3` attendance, `phase4-scores`, `phase5/5b/5c` notifications + birthdays + reports/settings, `phase6-account-access`, `phase7-delivery-automation` notification delivery + birthday automation). A dev server and the Supabase stack are expected to be running.
 
 ```bash
 npx playwright test              # full suite

@@ -54,26 +54,28 @@ export type CreateNotificationResult =
   | { ok: true; notificationId: string; recipientCount: number }
   | { ok: false; message: string }
 
+/** Resolved recipient info returned alongside notification creation. */
+export type ResolvedRecipient = { id: string; phone: string | null }
+
 function cleanText(value: string): string {
   return value.replace(/\s+/g, " ").trim()
 }
 
 /**
- * Server-side recipient resolution. Only profile ids are returned — the
- * browser never sees the recipient list or extra PII.
+ * Server-side recipient resolution. Only profile ids and phones are returned.
  */
-async function resolveRecipientIds(
+export async function resolveRecipientIds(
   admin: SupabaseAdminClient,
   audiences: NotificationAudience[]
-): Promise<string[]> {
+): Promise<ResolvedRecipient[]> {
   if (audiences.length === 0) return []
   const { data } = await admin
     .from("profiles")
-    .select("id")
+    .select("id, phone")
     .in("role", audiences as string[])
     .eq("status", "ACTIVE")
     .order("id", { ascending: true })
-  return (data ?? []).map((p) => p.id as string)
+  return (data ?? []).map((p) => ({ id: p.id as string, phone: (p.phone as string) ?? null }))
 }
 
 async function insertRecipients(
@@ -92,6 +94,9 @@ async function insertRecipients(
 /**
  * Creates a broadcast notification and fans out recipient rows.
  * The actor must be an admin; audiences are validated against the actor role.
+ * External delivery is NOT triggered here — the caller handles that
+ * (action layer or automation service) to avoid pulling Twilio into
+ * client bundles.
  */
 export async function createNotification(
   admin: SupabaseAdminClient,
@@ -119,7 +124,8 @@ export async function createNotification(
     return { ok: false, message: "غير مسموح بإرسال إشعار لهذا الجمهور" }
   }
 
-  const recipientIds = await resolveRecipientIds(admin, input.audiences)
+  const recipients = await resolveRecipientIds(admin, input.audiences)
+  const recipientIds = recipients.map((r) => r.id)
 
   const { data: inserted, error } = await admin
     .from("notifications")

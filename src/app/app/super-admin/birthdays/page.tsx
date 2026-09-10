@@ -18,7 +18,7 @@ export default async function SuperAdminBirthdaysPage() {
   return (
     <div className="space-y-4">
       <h1 className="font-heading text-xl font-extrabold">أعياد الميلاد القادمة</h1>
-      <BirthdayBoard rows={rows} />
+      <BirthdayBoard rows={rows} showAutomationButton />
     </div>
   )
 }
