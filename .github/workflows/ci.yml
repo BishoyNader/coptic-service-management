@@ -25,11 +25,12 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Public placeholders satisfy the compiler/build; real values are
-          # supplied at runtime in the deployed environment / e2e job.
+          # Public/non-secret placeholders satisfy the runtime in `next build`
+          # (static prerender constructs the server Supabase client). Real
+          # values are injected by Vercel at deploy time.
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci_placeholder
-          SUPABASE_SERVICE_ROLE_KEY: ""
+          SUPABASE_SERVICE_ROLE_KEY: sb_secret_ci_placeholder
       - name: Audit
         run: npm audit --audit-level=high
 
@@ -45,6 +46,8 @@ jobs:
           cache: npm
       - name: Install deps
         run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
       - name: Start Supabase stack
         uses: supabase/setup-cli@v1
         with:
