@@ -1,0 +1,36 @@
+name: Birthday automation cron
+
+# Scheduled daily run of https://<app>/api/cron/birthdays.
+#
+# Vercel Cron cannot send the `Authorization: Bearer <CRON_SECRET>` header
+# that the endpoint requires, so this is driven from GitHub Actions instead.
+# The job is a no-op until the `CRON_SECRET` repository secret is set
+# (allows the workflow to live in the repo before deployment finishes).
+#
+# Cairo runs UTC+2 year-round (no DST): 08:00 Cairo == 06:00 UTC.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: Trigger birthday automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ secrets.CRON_SECRET != '' }}
+    steps:
+      - name: Hit the cron endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          url="${SITE_URL:-https://coptic-service-management.vercel.app}"
+          code=$(curl -sS -o /tmp/cron.out -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${url}/api/cron/birthdays")
+          printf 'status=%s\n' "$code"
+          cat /tmp/cron.out
+          [ "$code" = "200" ] || [ "$code" = "202" ]

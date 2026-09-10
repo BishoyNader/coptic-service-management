@@ -429,19 +429,19 @@ function anonClient(): SupabaseClient {
     const submit = page.getByRole("button", { name: "إرسال الإشعار" })
 
     await submit.click()
-    await expect(page.getByText("اختار جمهور واحد على الأقل")).toBeVisible()
+    await expect(page.getByText("اختار جمهور واحد على الأقل").first()).toBeVisible()
 
     await page.getByRole("checkbox", { name: "المخدومين" }).click()
     await submit.click()
-    await expect(page.getByText("مطلوب كتابة عنوان الإشعار")).toBeVisible()
+    await expect(page.getByText("مطلوب كتابة عنوان الإشعار").first()).toBeVisible()
 
     await page.getByLabel("العنوان").fill("   ")
     await submit.click()
-    await expect(page.getByText("مطلوب كتابة عنوان الإشعار")).toBeVisible()
+    await expect(page.getByText("مطلوب كتابة عنوان الإشعار").first()).toBeVisible()
 
     await page.getByLabel("العنوان").fill("مسودة اختبار")
     await submit.click()
-    await expect(page.getByText("مطلوب كتابة نص الإشعار")).toBeVisible()
+    await expect(page.getByText("مطلوب كتابة نص الإشعار").first()).toBeVisible()
   })
 
   test("76. Admin composer offers only members & servants", async ({ page }) => {
@@ -592,18 +592,35 @@ function anonClient(): SupabaseClient {
       phone: member1.phone,
       password: member1.password,
     })
-    const { data: unread } = await memberClient
-      .from("notification_recipients")
-      .select("read_at")
-      .eq("profile_id", member1.userId)
-      .is("read_at", null)
-    expect((unread ?? []).length).toBe(1)
-    const { data: read } = await memberClient
-      .from("notification_recipients")
-      .select("read_at")
-      .eq("profile_id", member1.userId)
-      .not("read_at", "is", null)
-    expect((read ?? []).length).toBe(1)
+    // The mark-read round-trip is async; poll until the DB reflects the
+    // committed write instead of asserting on a single immediately-posted
+    // query (which races the server action).
+    await expect
+      .poll(
+        async () => {
+          const { data: unread } = await memberClient
+            .from("notification_recipients")
+            .select("read_at")
+            .eq("profile_id", member1.userId)
+            .is("read_at", null)
+          return (unread ?? []).length
+        },
+        { timeout: 10_000 }
+      )
+      .toBe(1)
+    await expect
+      .poll(
+        async () => {
+          const { data: read } = await memberClient
+            .from("notification_recipients")
+            .select("read_at")
+            .eq("profile_id", member1.userId)
+            .not("read_at", "is", null)
+          return (read ?? []).length
+        },
+        { timeout: 10_000 }
+      )
+      .toBe(1)
 
     await expect(
       page.locator('[aria-label="إشعارات غير مقروءة"]:visible')

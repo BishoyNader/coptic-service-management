@@ -102,6 +102,15 @@ export async function login(page: Page, phone: string, password: string) {
   await page.getByLabel("رقم الموبايل أو الإيميل").fill(phone)
   await page.locator("#password").fill(password)
   await page.getByRole("button", { name: "تسجيل الدخول" }).click()
+  // Wait for the post-login redirect AND the session cookie to be committed
+  // before the calling test asserts on user-scoped data (badge counts,
+  // inbox rows, sent lists). Without this, server actions can race the
+  // cookie switch and momentarily resolve the previous user's state.
+  // The redirect is a client-side App Router push (no document navigation),
+  // so poll the pathname rather than waiting on a navigation event.
+  await page.waitForFunction(() => /^\/app\//.test(window.location.pathname), undefined, {
+    timeout: 15_000,
+  })
 }
 
 export async function logout(page: Page) {
