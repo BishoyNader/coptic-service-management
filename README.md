@@ -61,10 +61,20 @@ Full route map (from `npm run build`):
 - **Delivery tracking** — `notification_deliveries` table records per-recipient per-channel status (QUEUED → SENT → DELIVERED, FAILED, PROVIDER_NOT_CONFIGURED). RLS: admin read/write only, users can read their own.
 - **Failure isolation** — External delivery failures never break in-app notifications. One recipient's failure never stops the batch. Per-recipient results are collected individually.
 - **Phone number safety** — Normalized at the server boundary. Not exposed unnecessarily. Not modified automatically.
-- **Birthday automation** — `birthdays_for_today()` SQL function + `runBirthdayAutomation()` service. Idempotent — unique constraint on `birthday_reminders` prevents duplicates. Runs via `GET /api/cron/birthdays?secret=CRON_SECRET` or manual admin trigger.
-- **Scheduled job** — Cron endpoint protected by `CRON_SECRET`. For production, configure an external scheduler (Vercel Cron, cron-job.org). For local dev, invoke manually via curl or the admin birthday page button.
+- **Birthday automation** — `birthdays_for_today()` SQL function + `runBirthdayAutomation()` service. Idempotent — unique constraint on `birthday_reminders` prevents duplicates. Runs via `GET /api/cron/birthdays` (Bearer auth) or manual admin trigger.
+- **Scheduled job** — Cron endpoint protected by `CRON_SECRET`; the secret is sent in the `Authorization: Bearer <CRON_SECRET>` header only (`?secret=` query param is rejected). For production, configure an external scheduler (Vercel Cron, cron-job.org). For local dev, invoke manually via curl or the admin birthday page button.
 - **Delivery log** — Super Admin can view delivery records (notification, recipient, channel, status, attempted time, provider message ID, error). Tabbed UI on the notifications page.
 - **Birthday automation button** — Admin/Super Admin birthday pages include a "تشغيل التهنئة التلقائية" button for manual invocation during development.
+
+## Integrity & UX hardening (Phase 9)
+
+- **Atomic attendance + scoring** — Check-ins are performed in a single DB transaction (`record_attendance_with_score`), so attendance and its earned score can never be written half-way. A partial unique index on active records makes concurrent double check-ins resolve to a single row (`duplicate`), and `void_attendance` archives a record exactly once (idempotent).
+- **Service-role-only RPCs** — Transactional RPCs are EXECUTE-restricted to the service role; client roles are blocked by RLS from reaching them. Server actions never trust browser-supplied identity, and every mutation path validates `isUuid` against junk input.
+- **Test-clock gate** — `ATTENDANCE_TEST_NOW` only drives time-dependent flows through `resolveServerNow(getServerNow)` and is hard-disabled whenever `NODE_ENV === "production"`, so a misconfigured production server can never run the engine on a test clock.
+- **Servant activity self-recording** — Servants can record their own participation in active liturgical/service activities (`/app/servant/activities`). Records are keyed by the Cairo calendar day, are idempotent on re-submission, and past recordings are immutable. RLS restricts writes to SERVANT profiles; a DB CHECK rejects future `recorded_on` dates, and only same-day records can be removed.
+- **Date-of-birth integrity** — A server validation rejects future `date_of_birth` values on registration/update, backed by a DB CHECK constraint that rejects them even if the API is bypassed.
+- **Audit coverage on membership changes** — Status changes and profile edits by admins write `PROFILE_UPDATED` / status audit entries via the service-role path, keeping the audit trail consistent with Phase 3.
+- **Cairo-day attendance reports** — Attendance reports bound "today" by Cairo midnight (`cairoDayStart`/`cairoDayEnd`), so overnight sessions are counted on the correct Coptic calendar day in every timezone.
 
 ## Getting started
 
@@ -112,8 +122,10 @@ Optional: configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_SMS_FROM`
 Set `CRON_SECRET` to protect the birthday automation endpoint. For local testing, call it manually:
 
 ```bash
-curl "http://localhost:3000/api/cron/birthdays?secret=YOUR_SECRET"
+curl -H "Authorization: Bearer YOUR_SECRET" "http://localhost:3000/api/cron/birthdays"
 ```
+
+Note: the cron endpoint accepts the secret **only** via the `Authorization: Bearer` header. A `?secret=` query parameter is intentionally rejected. Invocations are recorded as `BIRTHDAY_REMINDER` audit entries; the audit actor is the cron/system marker, and configuration-summary actions run under the real verified session.
 
 ### 4. Run the app
 
@@ -125,7 +137,7 @@ In development the recovery link must be opened on the same host the app runs on
 
 ## Testing
 
-End-to-end tests live in `e2e/` (`phase2`, `manual-crud`, `phase3` attendance, `phase4-scores`, `phase5/5b/5c` notifications + birthdays + reports/settings, `phase6-account-access`, `phase7-delivery-automation` notification delivery + birthday automation). A dev server and the Supabase stack are expected to be running.
+End-to-end tests live in `e2e/` (`phase2`, `manual-crud`, `phase3` attendance, `phase4-scores`, `phase5/5b/5c` notifications + birthdays + reports/settings, `phase6-account-access`, `phase7-delivery-automation` notification delivery + birthday automation, `phase8-scale-operations` bulk operations, `phase9-quality` reliability/RLS hardening). A dev server and the Supabase stack are expected to be running.
 
 ```bash
 npx playwright test              # full suite

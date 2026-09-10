@@ -7,6 +7,36 @@ export type ValidationResult =
 
 const PHONE_RE = /^\+?[0-9]{10,15}$/
 const NUMERIC_DIGITS = /^\d+$/
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** True for a well-formed v4-style UUID string (defense against junk input). */
+export function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value)
+}
+
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false
+  const [y, m, d] = value.split("-").map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
+function isFutureDate(value: string): boolean {
+  if (!isRealDate(value)) return false
+  const now = new Date()
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  return new Date(`${value}T00:00:00.000Z`) > today
+}
+
+/** Validates a "YYYY-MM-DD" date-of-birth input; returns an error or null. */
+export function validateDateOfBirth(value: string | null | undefined): string | null {
+  if (value === undefined || value === null || value === "") return null
+  if (typeof value !== "string") return "تاريخ الميلاد غير صحيح"
+  if (!isRealDate(value)) return "تاريخ الميلاد غير صحيح"
+  if (isFutureDate(value)) return "تاريخ الميلاد لا يمكن أن يكون في المستقبل"
+  return null
+}
 
 export function isPublicRole(role: string): role is AppRole {
   return (PUBLIC_REGISTRATION_ROLES as readonly string[]).includes(role)
@@ -46,9 +76,11 @@ export function validateRegistration(input: Record<string, unknown>): Validation
   }
 
   if (input.dateOfBirth !== undefined && input.dateOfBirth !== "") {
-    if (typeof input.dateOfBirth !== "string" || isNaN(Date.parse(input.dateOfBirth))) {
+    if (typeof input.dateOfBirth !== "string") {
       return { ok: false, field: "dateOfBirth", message: "تاريخ الميلاد غير صحيح" }
     }
+    const dobError = validateDateOfBirth(input.dateOfBirth)
+    if (dobError) return { ok: false, field: "dateOfBirth", message: dobError }
   }
 
   for (const f of ["fatherPhone", "motherPhone"] as const) {

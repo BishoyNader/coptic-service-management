@@ -13,7 +13,8 @@ import {
   isAdminRole,
   type AppRole,
 } from "@/lib/roles"
-import { validateRegistration } from "@/lib/validation"
+import { validateRegistration, isUuid } from "@/lib/validation"
+import { logAudit } from "@/services/auth-service"
 
 export type ProfileUpdatePayload = {
   fullName: string
@@ -45,6 +46,7 @@ export async function adminUpdateProfileAction(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(id)) return { ok: false, message: "بيانات غير صحيحة" }
 
   const { data: adminProfile } = await supabase
     .from("profiles")
@@ -56,7 +58,7 @@ export async function adminUpdateProfileAction(
     return { ok: false, message: "غير مصرح" }
   }
 
-  return updateProfileById(supabase, id, {
+  const result = await updateProfileById(supabase, id, {
     full_name: payload.fullName,
     phone: payload.phone,
     date_of_birth: payload.dateOfBirth || null,
@@ -65,6 +67,19 @@ export async function adminUpdateProfileAction(
     mother_phone: payload.motherPhone || null,
     status: payload.status ?? "ACTIVE",
   })
+
+  if (result.ok) {
+    const admin = createAdminClient()
+    await logAudit(admin, {
+      actorId: user.id,
+      action: "PROFILE_UPDATED",
+      entity: "PROFILE",
+      entityId: id,
+      metadata: { updatedBy: user.id, status: payload.status },
+    }).catch(() => {})
+  }
+
+  return result
 }
 
 export async function adminUpdateStatusAction(
@@ -77,6 +92,7 @@ export async function adminUpdateStatusAction(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(id)) return { ok: false, message: "بيانات غير صحيحة" }
 
   const { data: adminProfile } = await supabase
     .from("profiles")
@@ -88,7 +104,7 @@ export async function adminUpdateStatusAction(
     return { ok: false, message: "غير مصرح" }
   }
 
-  return adminChangeStatus(admin, user.id, id, status)
+  return adminChangeStatus(admin, user.id, adminProfile.role as AppRole, id, status)
 }
 
 type AdminCreateUserActionPayload = {

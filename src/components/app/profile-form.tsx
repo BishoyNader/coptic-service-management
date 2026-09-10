@@ -104,9 +104,10 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
 
       {/* Profile fields */}
       <div className="rounded-2xl bg-card shadow-sm ring-1 ring-foreground/5">
-        <FieldRow icon={<User className="size-4" />} label="الاسم بالكامل">
+        <FieldRow id="pf-full-name" icon={<User className="size-4" />} label="الاسم بالكامل">
           {editing ? (
             <Input
+              id="pf-full-name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="h-9 text-sm text-start"
@@ -116,9 +117,10 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
           )}
         </FieldRow>
 
-        <FieldRow icon={<Phone className="size-4" />} label="رقم الموبايل" dir="ltr">
+        <FieldRow id="pf-phone" icon={<Phone className="size-4" />} label="رقم الموبايل" dir="ltr">
           {editing ? (
             <Input
+              id="pf-phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               dir="ltr"
@@ -129,9 +131,10 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
           )}
         </FieldRow>
 
-        <FieldRow icon={<Calendar className="size-4" />} label="تاريخ الميلاد">
+        <FieldRow id="pf-dob" icon={<Calendar className="size-4" />} label="تاريخ الميلاد">
           {editing ? (
             <Input
+              id="pf-dob"
               type="date"
               max={new Date().toISOString().split("T")[0]}
               value={dateOfBirth}
@@ -147,9 +150,10 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
 
         {role === "member" && (
           <>
-            <FieldRow icon={<Phone className="size-4" />} label="رقم الأب" dir="ltr">
+            <FieldRow id="pf-father" icon={<Phone className="size-4" />} label="رقم الأب" dir="ltr">
               {editing ? (
                 <Input
+                  id="pf-father"
                   value={fatherPhone}
                   onChange={(e) => setFatherPhone(e.target.value)}
                   dir="ltr"
@@ -161,9 +165,10 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
               )}
             </FieldRow>
 
-            <FieldRow icon={<Phone className="size-4" />} label="رقم الأم" dir="ltr">
+            <FieldRow id="pf-mother" icon={<Phone className="size-4" />} label="رقم الأم" dir="ltr">
               {editing ? (
                 <Input
+                  id="pf-mother"
                   value={motherPhone}
                   onChange={(e) => setMotherPhone(e.target.value)}
                   dir="ltr"
@@ -175,9 +180,10 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
               )}
             </FieldRow>
 
-            <FieldRow icon={<MapPin className="size-4" />} label="العنوان">
+            <FieldRow id="pf-address" icon={<MapPin className="size-4" />} label="العنوان">
               {editing ? (
                 <Input
+                  id="pf-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="h-9 text-sm text-start"
@@ -201,11 +207,13 @@ export function ProfileForm({ profile, role, personalCode, onSubmit }: ProfileFo
 }
 
 function FieldRow({
+  id,
   icon,
   label,
   children,
   dir,
 }: {
+  id?: string
   icon: React.ReactNode
   label: string
   children: React.ReactNode
@@ -213,10 +221,13 @@ function FieldRow({
 }) {
   return (
     <div className={cn("flex items-center justify-between border-b border-border px-4 py-3 last:border-0", dir === "ltr" && "flex-row-reverse")}>
-      <span className="flex items-center gap-2 text-sm text-muted-foreground">
+      <label
+        htmlFor={id}
+        className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+      >
         {icon}
         {label}
-      </span>
+      </label>
       <div className="text-sm">{children}</div>
     </div>
   )

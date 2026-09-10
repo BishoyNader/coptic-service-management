@@ -10,7 +10,7 @@ import {
 } from "@/services/privileged-user-service"
 import { logAudit } from "@/services/auth-service"
 import { ROLES } from "@/lib/roles"
-import { normalizePhone } from "@/lib/validation"
+import { normalizePhone, isUuid } from "@/lib/validation"
 
 const PHONE_RE = /^\+?[0-9]{10,15}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -103,6 +103,7 @@ export async function adminResetPasswordAction(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(userId)) return { ok: false, message: "بيانات غير صحيحة" }
 
   const { data: actor } = await supabase
     .from("profiles")
@@ -210,6 +211,11 @@ export async function resetPasswordAction(
   }
 
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, field: "general", message: "غير مصرح" }
+
   const { error } = await supabase.auth.updateUser({ password: newPassword })
   if (error) {
     if (/session/i.test(error.message)) {

@@ -78,19 +78,6 @@ export async function resolveRecipientIds(
   return (data ?? []).map((p) => ({ id: p.id as string, phone: (p.phone as string) ?? null }))
 }
 
-async function insertRecipients(
-  admin: SupabaseAdminClient,
-  notificationId: string,
-  profileIds: string[]
-): Promise<void> {
-  for (let i = 0; i < profileIds.length; i += RECIPIENT_BATCH_SIZE) {
-    const chunk = profileIds.slice(i, i + RECIPIENT_BATCH_SIZE)
-    const rows = chunk.map((profileId) => ({ notification_id: notificationId, profile_id: profileId }))
-    const { error } = await admin.from("notification_recipients").insert(rows)
-    if (error) throw new Error(`failed to fan out recipients: ${error.message}`)
-  }
-}
-
 /**
  * Creates a broadcast notification and fans out recipient rows.
  * The actor must be an admin; audiences are validated against the actor role.
@@ -127,22 +114,20 @@ export async function createNotification(
   const recipients = await resolveRecipientIds(admin, input.audiences)
   const recipientIds = recipients.map((r) => r.id)
 
-  const { data: inserted, error } = await admin
-    .from("notifications")
-    .insert({
-      title,
-      body,
-      audience: input.audiences,
-      sender_id: input.actorId,
-    })
-    .select("id")
-    .single()
+  // Notification + all recipient rows created atomically in one DB
+  // transaction (create_notification) — a mid-fan-out failure can never
+  // leave a notification with a partial delivery list.
+  const { data: rpcData, error } = await admin.rpc("create_notification", {
+    p_title: title,
+    p_body: body,
+    p_audience: input.audiences,
+    p_sender_id: input.actorId,
+    p_recipient_ids: recipientIds,
+  })
   if (error) throw new Error(`create notification: ${error.message}`)
-  const notificationId = inserted.id as string
 
-  if (recipientIds.length > 0) {
-    await insertRecipients(admin, notificationId, recipientIds)
-  }
+  const result = rpcData as unknown as { id: string; recipient_count: number }
+  const notificationId = result.id
 
   await logAudit(admin, {
     actorId: input.actorId,
@@ -152,7 +137,7 @@ export async function createNotification(
     metadata: { audiences: input.audiences, recipientCount: recipientIds.length },
   })
 
-  return { ok: true, notificationId, recipientCount: recipientIds.length }
+  return { ok: true, notificationId, recipientCount: result.recipient_count }
 }
 
 /**

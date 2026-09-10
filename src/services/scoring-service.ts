@@ -347,9 +347,60 @@ export type WeeklyScoresInput = {
   note?: string | null
 }
 
+type WeeklyPlanItem = {
+  category: ScoringCategory
+  points: number
+  ruleId: string | null
+  sessionDate: string
+  periodKey: string
+  note: string | null
+}
+
+/**
+ * Derives the exact point values for the whole weekly card from the active
+ * rules. The scoring engine stays in TS — this is the same per-category math
+ * `upsertManualScore` applied, gathered into one atomic DB transaction.
+ */
+function buildWeeklyPlan(
+  rules: ScoringRule[],
+  scores: WeeklyScoresInput,
+  weekRef: Date | string
+): WeeklyPlanItem[] {
+  const config = rulesByCategory(rules)
+  const checkValue = (category: ScoringCategory, enabled: boolean): number =>
+    enabled ? Number(config[category]?.point_value ?? 0) : 0
+
+  const categories: Array<[ScoringCategory, number]> = [
+    ["WEEKLY_COMMITMENT", scores.commitment],
+    ["TUNIC", checkValue("TUNIC", scores.tunic)],
+    ["COMMUNION", checkValue("COMMUNION", scores.communion)],
+    ["SERVICE_COMMITMENT", scores.serviceCommitment],
+    ["BONUS", checkValue("BONUS", scores.bonus)],
+  ]
+
+  return categories.map(([category, points]) => {
+    const kind = categoryPeriodKind(category)
+    const period = periodForDate(kind, weekRef)
+    return {
+      category,
+      points,
+      ruleId: config[category]?.id ?? null,
+      sessionDate: toDateString(weekRef),
+      periodKey: period.key,
+      note: scores.note ?? null,
+    }
+  })
+}
+
 /**
  * The whole weekly card in one call. Attendance is never part of the input —
  * it is always recomputed from the attendance engine downstream.
+ *
+ * All five categories are persisted in a single DB transaction
+ * (save_weekly_scores): a failure in any one of them rolls the whole card
+ * back instead of leaving a partially-scored week. Audits stay here — the
+ * function returns what changed per category so the exact previous/next
+ * values the architecture records are preserved.
  */
 export async function saveWeeklyScores(
   admin: ScoreClient,
@@ -371,60 +422,83 @@ export async function saveWeeklyScores(
     return { ok: false, message: "التزام الخدمة لازم يكون رقم من 0 لـ 10" }
   }
 
-  let changedAny = false
-  const results = await Promise.all([
-    upsertManualScore(admin, {
-      actorId,
-      profileId,
-      category: "WEEKLY_COMMITMENT",
-      refDate: weekRef,
-      points: scores.commitment,
-      note: scores.note,
-    }),
-    upsertManualScore(admin, {
-      actorId,
-      profileId,
-      category: "TUNIC",
-      refDate: weekRef,
-      points: scores.tunic ? await checkboxValue(admin, "TUNIC") : 0,
-      note: scores.note,
-    }),
-    upsertManualScore(admin, {
-      actorId,
-      profileId,
-      category: "COMMUNION",
-      refDate: weekRef,
-      points: scores.communion ? await checkboxValue(admin, "COMMUNION") : 0,
-      note: scores.note,
-    }),
-    upsertManualScore(admin, {
-      actorId,
-      profileId,
-      category: "SERVICE_COMMITMENT",
-      refDate: weekRef,
-      points: scores.serviceCommitment,
-      note: scores.note,
-    }),
-    upsertManualScore(admin, {
-      actorId,
-      profileId,
-      category: "BONUS",
-      refDate: weekRef,
-      points: scores.bonus ? await checkboxValue(admin, "BONUS") : 0,
-      note: scores.note,
-    }),
-  ])
+  const rules = await getActiveScoringRules(admin, MANUAL_SCORE_CATEGORIES)
+  const config = rulesByCategory(rules)
+  const plan = buildWeeklyPlan(rules, scores, weekRef)
 
-  for (const r of results) {
-    if (!r.ok) return r
-    if (r.changed) changedAny = true
+  // Same contract as upsertManualScore: every category must have an active
+  // rule before anything is written.
+  for (const item of plan) {
+    if (!config[item.category]) {
+      return { ok: false, message: "لا توجد قاعدة نشطة لهذه الفئة" }
+    }
   }
-  return { ok: true, changed: changedAny }
-}
 
-async function checkboxValue(admin: ScoreClient, category: ScoringCategory): Promise<number> {
-  const rules = rulesByCategory(await getActiveScoringRules(admin, [category]))
-  return Number(rules[category]?.point_value ?? 0)
+  const items = plan.map(({ category, points, ruleId, sessionDate, periodKey, note }) => ({
+    category,
+    points,
+    rule_id: ruleId,
+    session_date: sessionDate,
+    period_key: periodKey,
+    note,
+  }))
+
+  const { data: rpcData, error } = await admin.rpc("save_weekly_scores", {
+    p_profile_id: profileId,
+    p_actor_id: actorId,
+    p_items: items as never,
+  })
+  if (error) return { ok: false, message: "تعذر حفظ الدرجات" }
+
+  const results = (rpcData ?? []) as unknown as Array<{
+    category: string
+    status: "created" | "updated" | "voided" | "unchanged"
+    id?: string
+    prev_points?: number | string
+    prev_note?: string | null
+  }>
+
+  let changedAny = false
+  for (const r of results) {
+    const item = plan.find((p) => p.category === r.category)
+    if (!item) continue
+
+    if (r.status === "created") {
+      changedAny = true
+      await logAudit(admin, {
+        actorId,
+        action: "SCORE_CREATED",
+        entity: "SCORE",
+        entityId: r.id,
+        next: { points: item.points, category: item.category, period_key: item.periodKey, profile_id: profileId },
+        metadata: { category: item.category, period_key: item.periodKey, profile_id: profileId, points: item.points },
+      })
+    } else if (r.status === "updated") {
+      changedAny = true
+      await logAudit(admin, {
+        actorId,
+        action: "SCORE_CORRECTED",
+        entity: "SCORE",
+        entityId: r.id,
+        previous: { points: Number(r.prev_points), note: r.prev_note ?? null },
+        next: { points: item.points, category: item.category, period_key: item.periodKey, profile_id: profileId },
+        metadata: { category: item.category, period_key: item.periodKey, profile_id: profileId, from: Number(r.prev_points), to: item.points },
+      })
+    } else if (r.status === "voided") {
+      changedAny = true
+      await logAudit(admin, {
+        actorId,
+        action: "SCORE_CORRECTED",
+        entity: "SCORE",
+        entityId: r.id,
+        previous: { points: Number(r.prev_points), note: r.prev_note ?? null },
+        next: { points: 0, is_voided: true, profile_id: profileId },
+        metadata: { category: item.category, period_key: item.periodKey, profile_id: profileId },
+      })
+    }
+  }
+
+  return { ok: true, changed: changedAny }
 }
 
 // --- Monthly activity (30-day eligibility, server-side) ---------------------

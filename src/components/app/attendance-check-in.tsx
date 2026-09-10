@@ -218,6 +218,7 @@ export function AttendanceCheckIn({ defaultType = "CHURCH" }: AttendanceCheckInP
           <button
             key={t}
             type="button"
+            aria-pressed={type === t}
             onClick={() => switchType(t)}
             className={cn(
               "flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium transition-colors",
@@ -505,7 +506,7 @@ function CodeEntryPanel({
           className="w-full rounded-2xl border border-input bg-transparent px-4 py-3 text-center font-heading text-2xl font-extrabold tracking-[0.5em] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
         />
         {previewError ? (
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-destructive">
+          <p role="alert" className="mt-2 flex items-center gap-1.5 text-sm text-destructive">
             <AlertCircle className="size-4" />
             {previewError}
           </p>
@@ -543,7 +544,10 @@ function SuccessCard({
   const isServant = person?.role === "SERVANT"
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-coptic-teal p-6 text-center text-primary-foreground shadow-md">
+    <div
+      role="status"
+      className="relative overflow-hidden rounded-3xl bg-coptic-teal p-6 text-center text-primary-foreground shadow-md"
+    >
       <div className="pointer-events-none absolute inset-0 coptic-lattice-gold opacity-60" />
       <div className="relative space-y-2">
         <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-white text-coptic-teal">
@@ -592,7 +596,10 @@ function DuplicateCard({
 }) {
   const person = result.person
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-coptic-gold-soft/70 p-6 text-center shadow-sm ring-1 ring-coptic-gold/20">
+    <div
+      role="status"
+      className="relative overflow-hidden rounded-3xl bg-coptic-gold-soft/70 p-6 text-center shadow-sm ring-1 ring-coptic-gold/20"
+    >
       <div className="pointer-events-none absolute inset-0 coptic-lattice-gold opacity-40" />
       <div className="relative space-y-2">
         <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-coptic-gold text-white">
@@ -628,12 +635,15 @@ function ErrorCard({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex flex-col items-center gap-3 rounded-3xl bg-card px-6 py-10 text-center shadow-sm ring-1 ring-foreground/5">
-        <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-          <AlertCircle className="size-7" />
-        </div>
-        <p className="font-heading font-bold">{message}</p>
+<div
+      role="alert"
+      className="flex flex-col items-center gap-3 rounded-3xl bg-card px-6 py-10 text-center shadow-sm ring-1 ring-foreground/5"
+    >
+      <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <AlertCircle className="size-7" />
       </div>
+      <p className="font-heading font-bold">{message}</p>
+    </div>
       <button
         type="button"
         onClick={onRetry}

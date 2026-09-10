@@ -464,12 +464,28 @@ test.describe("PHASE 7 — Notification delivery & birthday automation", () => {
     expect(error).not.toBeNull()
   })
 
-  test("134. Cron endpoint rejects unauthorized requests", async ({ request }) => {
-    const response = await request.get("http://localhost:3000/api/cron/birthdays?secret=wrong")
-    expect(response.status()).toBe(401)
+  test("134. Cron endpoint requires the header secret (query param is ignored)", async ({ request }) => {
+    const base = "http://localhost:3000/api/cron/birthdays"
+    // Wrong bearer header is rejected.
+    const wrongHeader = await request.get(base, {
+      headers: { Authorization: "Bearer wrong-secret" },
+    })
+    expect(wrongHeader.status()).toBe(401)
+    // The old ?secret= query-string form no longer authenticates.
+    const queryParam = await request.get(
+      `${base}?secret=${encodeURIComponent(process.env.CRON_SECRET ?? "")}`
+    )
+    expect(queryParam.status()).toBe(401)
+    // A valid bearer header runs the (idempotent) automation.
+    const validHeader = await request.get(base, {
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+    })
+    expect(validHeader.status()).toBe(200)
+    const body = await validHeader.json()
+    expect(body).toHaveProperty("totalEligible")
   })
 
-  test("135. Cron endpoint rejects requests without secret", async ({ request }) => {
+  test("135. Cron endpoint rejects requests without a secret", async ({ request }) => {
     const response = await request.get("http://localhost:3000/api/cron/birthdays")
     expect(response.status()).toBe(401)
   })
@@ -593,10 +609,11 @@ test.describe("PHASE 7 — Notification delivery & birthday automation", () => {
     await login(page, superSeed.phone, superSeed.password)
     await page.goto("/app/super-admin/notifications?tab=delivery-log")
 
-    // Should show delivery records or empty state
-    const hasRecords = await page.getByText("لا توجد سجلات توصيل").isVisible().catch(() => false)
-    const hasLog = await page.getByText("داخل التطبيق").first().isVisible().catch(() => false)
-    expect(hasRecords || hasLog).toBe(true)
+    // Should show delivery records or empty state. The page streams in server
+    // components after `load`, so wait (auto-retrying) for either outcome.
+    const emptyState = page.getByText("لا توجد سجلات توصيل")
+    const logRows = page.getByText("داخل التطبيق").first()
+    await expect(emptyState.or(logRows).first()).toBeVisible({ timeout: 15_000 })
   })
 
   // -------------------------------------------------------------------------

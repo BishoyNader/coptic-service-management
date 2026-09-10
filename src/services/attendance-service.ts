@@ -21,14 +21,25 @@ import {
  * Production always uses the real server clock. An optional
  * `ATTENDANCE_TEST_NOW` ISO override exists ONLY so the deterministic E2E
  * suite can drive time-dependent flows; a client can never influence it.
+ * The override is hard-disabled when `NODE_ENV === "production"` so a
+ * misconfigured production server can never run the engine on a test clock.
  */
-export function getServerNow(): Date {
-  const override = process.env.ATTENDANCE_TEST_NOW
-  if (override) {
+export function resolveServerNow(
+  override: string | undefined,
+  overrideAllowed: boolean
+): Date {
+  if (overrideAllowed && override) {
     const d = new Date(override)
     if (!Number.isNaN(d.getTime())) return d
   }
   return new Date()
+}
+
+export function getServerNow(): Date {
+  return resolveServerNow(
+    process.env.ATTENDANCE_TEST_NOW,
+    process.env.NODE_ENV !== "production"
+  )
 }
 
 export type AttendancePerson = {
@@ -228,57 +239,46 @@ async function executeCheckIn(
   )
   const points = resolution.points
 
-  const recordPayload = {
-    session_id: sessionId,
-    profile_id: person.id,
-    attended_at: now.toISOString(),
-    points,
-    recorded_by: actorId,
-    source,
-    status: "PRESENT",
-  }
-
-  const { data: record, error: insertError } = await admin
-    .from("attendance_records")
-    .insert(recordPayload)
-    .select("id")
-    .single()
-
-  if (insertError) {
-    // Unique (profile_id, session_id) active — the other request won the race.
-    if (insertError.code === "23505") {
-      const { data: raced } = await admin
-        .from("attendance_records")
-        .select("id, attended_at, points")
-        .eq("profile_id", person.id)
-        .eq("session_id", sessionId)
-        .neq("status", "ARCHIVED")
-        .maybeSingle()
-      if (raced) {
-        return {
-          status: "duplicate",
-          person: personToOutcome(person),
-          attendedAt: raced.attended_at,
-          type,
-          points: Number(raced.points),
-        }
-      }
+  // Attendance + earned score persisted atomically in one DB transaction
+  // (record_attendance_with_score). The partial unique index is internal to
+  // the function, so a concurrent double check-in resolves to "duplicate".
+  const { data: rpcData, error: rpcError } = await admin.rpc(
+    "record_attendance_with_score",
+    {
+      p_session_id: sessionId,
+      p_profile_id: person.id,
+      p_attended_at: now.toISOString(),
+      p_points: points,
+      p_recorded_by: actorId,
+      p_source: source,
+      p_score_category:
+        points > 0 && person.role === "SERVED_MEMBER"
+          ? attendanceCategory(type)
+          : null,
+      p_score_rule_id: resolution.rule?.id ?? null,
+      p_session_date: cairoDate,
     }
+  )
+
+  if (rpcError) {
     return { status: "error", message: "تعذر تسجيل الحضور" }
   }
 
-  // Persist the earned score only for served members (servants track status
-  // only — the rules engine already yields 0 for them via applicable_role).
-  if (points > 0 && person.role === "SERVED_MEMBER") {
-    await admin.from("score_records").insert({
-      profile_id: person.id,
-      category: attendanceCategory(type),
-      points,
-      rule_id: resolution.rule?.id ?? null,
-      attendance_record_id: record.id,
-      session_date: cairoDate,
-      recorded_by: actorId,
-    })
+  const result = rpcData as unknown as {
+    status: string
+    id: string
+    attended_at: string
+    points: number | string
+  }
+
+  if (result.status === "duplicate") {
+    return {
+      status: "duplicate",
+      person: personToOutcome(person),
+      attendedAt: result.attended_at,
+      type,
+      points: Number(result.points),
+    }
   }
 
   const auditAction = source === "MANUAL" ? "ATTENDANCE_MANUAL" : "ATTENDANCE_CHECKIN"
@@ -286,7 +286,7 @@ async function executeCheckIn(
     actorId,
     action: auditAction,
     entity: "ATTENDANCE",
-    entityId: record.id,
+    entityId: result.id,
     metadata: { type, source, points, session_id: sessionId },
   })
 
@@ -439,17 +439,19 @@ export async function correctAttendance(
   // --- Void (soft delete) ---------------------------------------------------
   if ("voided" in change) {
     if (!change.voided) return { ok: false, message: "تغيير غير صحيح" }
-    const { error } = await admin
-      .from("attendance_records")
-      .update({ status: "ARCHIVED" })
-      .eq("id", recordId)
 
-    if (error) return { ok: false, message: "تعذر إلغاء التسجيل" }
+    // Archive record + soft-void score atomically in one DB transaction.
+    const { data: voidRes, error: voidError } = await admin.rpc("void_attendance", {
+      p_record_id: recordId,
+    })
+    if (voidError) return { ok: false, message: "تعذر إلغاء التسجيل" }
 
-    await admin
-      .from("score_records")
-      .update({ is_voided: true })
-      .eq("attendance_record_id", recordId)
+    const voided = voidRes as unknown as { ok?: boolean; error?: string }
+    if (!voided.ok) {
+      if (voided.error === "not_found") return { ok: false, message: "سجل الحضور غير موجود" }
+      if (voided.error === "already_archived") return { ok: false, message: "السجل ملغي بالفعل" }
+      return { ok: false, message: "تعذر إلغاء التسجيل" }
+    }
 
     await logAudit(admin, {
       actorId,
@@ -506,51 +508,31 @@ export async function correctAttendance(
   )
   const newPoints = role === "SERVED_MEMBER" ? resolution.points : 0
 
-  const { error: updateError } = await admin
-    .from("attendance_records")
-    .update({ session_id: newSessionId, points: newPoints, status: "PRESENT" })
-    .eq("id", recordId)
-
-  if (updateError) return { ok: false, message: "تعذر تحديث السجل" }
-
-  const { data: score } = await admin
-    .from("score_records")
-    .select("id, is_voided")
-    .eq("attendance_record_id", recordId)
-    .maybeSingle()
-
-  if (role === "SERVED_MEMBER") {
-    if (newPoints > 0) {
-      if (score) {
-        await admin
-          .from("score_records")
-          .update({
-            category: attendanceCategory(newType),
-            points: newPoints,
-            rule_id: resolution.rule?.id ?? null,
-            session_date: cairoDate,
-            is_voided: false,
-          })
-          .eq("id", score.id)
-      } else {
-        await admin.from("score_records").insert({
-          profile_id: record.profile_id,
-          category: attendanceCategory(newType),
-          points: newPoints,
-          rule_id: resolution.rule?.id ?? null,
-          attendance_record_id: recordId,
-          session_date: cairoDate,
-          recorded_by: actorId,
-        })
-      }
-    } else if (score && !score.is_voided) {
-      await admin
-        .from("score_records")
-        .update({ is_voided: true })
-        .eq("id", score.id)
+  // Attendance move + score resize/void persisted atomically in one DB
+  // transaction (correct_attendance_type). The unique target-session check
+  // done above is re-enforced inside the function for the concurrent case.
+  const { data: corrRes, error: corrError } = await admin.rpc(
+    "correct_attendance_type",
+    {
+      p_record_id: recordId,
+      p_new_session_id: newSessionId,
+      p_new_points: newPoints,
+      p_score_category: newPoints > 0 ? attendanceCategory(newType) : null,
+      p_score_rule_id: resolution.rule?.id ?? null,
+      p_session_date: cairoDate,
+      p_actor_id: actorId,
     }
-  } else if (score && !score.is_voided) {
-    await admin.from("score_records").update({ is_voided: true }).eq("id", score.id)
+  )
+  if (corrError) return { ok: false, message: "تعذر تصحيح الحضور" }
+
+  const corrected = corrRes as unknown as { ok?: boolean; error?: string }
+  if (!corrected.ok) {
+    if (corrected.error === "not_found") return { ok: false, message: "سجل الحضور غير موجود" }
+    if (corrected.error === "already_archived") return { ok: false, message: "السجل ملغي بالفعل" }
+    if (corrected.error === "duplicate") {
+      return { ok: false, message: "يوجد حضور مسجّل بالفعل بهذا النوع في نفس اليوم" }
+    }
+    return { ok: false, message: "تعذر تصحيح الحضور" }
   }
 
   await logAudit(admin, {

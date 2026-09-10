@@ -81,6 +81,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
   const [busy, setBusy] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<ScoringRule | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
 
   const openAdd = () => {
     setEditingId(null)
@@ -142,7 +143,9 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
   }
 
   const restore = async (rule: ScoringRule) => {
+    setRestoringId(rule.id)
     const res = await restoreScoringRuleAction(rule.id)
+    setRestoringId(null)
     if (!res.ok) {
       toast.error(res.message)
       return
@@ -220,11 +223,16 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
                         variant="outline"
                         size="xs"
                         onClick={() => restore(rule)}
+                        disabled={restoringId === rule.id}
                         data-testid={`restore-rule-${rule.id}`}
                         className="gap-1"
                       >
-                        <RotateCcw className="size-3" />
-                        استرجاع
+                        {restoringId === rule.id ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          <RotateCcw className="size-3" />
+                        )}
+                        {restoringId === rule.id ? "جاري الاسترجاع..." : "استرجاع"}
                       </Button>
                     ) : (
                       <Button
@@ -257,7 +265,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
           </DialogHeader>
 
           <div className="space-y-3" data-testid="rule-form">
-            <Field label="الفئة">
+            <Field id="rule-form-category" label="الفئة">
               <select
                 value={draft.category}
                 onChange={(e) =>
@@ -274,7 +282,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
               </select>
             </Field>
 
-            <Field label="الاسم">
+            <Field id="rule-form-name" label="الاسم">
               <input
                 value={draft.name}
                 onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -284,7 +292,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
               />
             </Field>
 
-            <Field label="قيمة النقاط">
+            <Field id="rule-form-points" label="قيمة النقاط">
               <input
                 type="number"
                 min={0}
@@ -317,7 +325,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="من (توقيت)">
+              <Field id="rule-form-start" label="من (توقيت)">
                 <input
                   type="time"
                   value={draft.start_time}
@@ -326,7 +334,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
                   className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
                 />
               </Field>
-              <Field label="إلى (توقيت)">
+              <Field id="rule-form-end" label="إلى (توقيت)">
                 <input
                   type="time"
                   value={draft.end_time}
@@ -337,7 +345,7 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
               </Field>
             </div>
 
-            <Field label="يتطلب على الأقل (أيام)">
+            <Field id="rule-form-min-days" label="يتطلب على الأقل (أيام)">
               <input
                 type="number"
                 min={1}
@@ -398,10 +406,20 @@ export function ScoringRulesSettings({ rules }: { rules: ScoringRule[] }) {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  id,
+  label,
+  children,
+}: {
+  id?: string
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <div className="space-y-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <label htmlFor={id} className="block text-sm font-medium">
+        {label}
+      </label>
       {children}
     </div>
   )

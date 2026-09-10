@@ -45,12 +45,14 @@ export function PaginationControls({
       <p className="text-xs text-muted-foreground">إجمالي {total}</p>
       <div className="flex items-center gap-2">
         {page > 1 ? (
-          <Link href={buildHref(pathname, page - 1, searchParams)}>
-            <Button variant="outline" className="h-9 gap-1">
-              <ChevronRight className="size-4" />
-              السابق
-            </Button>
-          </Link>
+          <Button
+            render={<Link href={buildHref(pathname, page - 1, searchParams)} />}
+            variant="outline"
+            className="h-9 gap-1"
+          >
+            <ChevronRight className="size-4" />
+            السابق
+          </Button>
         ) : (
           <Button variant="outline" disabled className="h-9 gap-1">
             <ChevronRight className="size-4" />
@@ -63,12 +65,14 @@ export function PaginationControls({
         </span>
 
         {page < totalPages ? (
-          <Link href={buildHref(pathname, page + 1, searchParams)}>
-            <Button variant="outline" className="h-9 gap-1">
-              التالي
-              <ChevronLeft className="size-4" />
-            </Button>
-          </Link>
+          <Button
+            render={<Link href={buildHref(pathname, page + 1, searchParams)} />}
+            variant="outline"
+            className="h-9 gap-1"
+          >
+            التالي
+            <ChevronLeft className="size-4" />
+          </Button>
         ) : (
           <Button variant="outline" disabled className="h-9 gap-1">
             التالي

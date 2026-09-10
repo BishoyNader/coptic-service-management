@@ -67,6 +67,7 @@ export default async function SuperAdminMembersPage({
           type="text"
           name="q"
           defaultValue={q}
+          aria-label="البحث بالاسم"
           placeholder="ابحث بالاسم..."
           className="h-11 w-full rounded-xl border border-input bg-transparent ps-10 pe-4 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
         />

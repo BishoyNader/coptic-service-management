@@ -13,6 +13,7 @@ import type { AppRole } from "../lib/roles"
 import type { ScoringCategory } from "../lib/constants"
 import type { SupabaseServerClient } from "../lib/supabase/server"
 import { toAttendanceRows } from "./attendance-service"
+import { cairoDayStart, cairoDayEnd } from "../lib/cairo"
 
 export type ReportRange = { from: string; to: string }
 
@@ -76,13 +77,19 @@ export async function buildAttendanceReport(
   range: ReportRange
 ): Promise<AttendanceReport> {
   const { from, to } = range
+  // The range is a CAIRO wall-date window. Bound it by the UTC instants of
+  // Cairo midnight so a record at, say, 00:30 Cairo is included for its own
+  // day and never leaks into the previous/next calendar day.
+  const fromInstant = cairoDayStart(new Date(`${from}T00:00:00.000Z`)).toISOString()
+  const toBoundary = cairoDayEnd(new Date(`${to}T00:00:00.000Z`)).toISOString()
+
   const { data } = await client
     .from("attendance_records")
     .select(
       "id, attended_at, points, source, status, session:attendance_sessions(type), profile:profiles!attendance_records_profile_id_fkey(full_name, role)"
     )
-    .gte("attended_at", `${from}T00:00:00.000Z`)
-    .lte("attended_at", `${to}T23:59:59.999Z`)
+    .gte("attended_at", fromInstant)
+    .lte("attended_at", toBoundary)
     .limit(2000)
 
   const rows = toAttendanceRows((data ?? []) as never[]).filter(

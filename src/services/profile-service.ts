@@ -1,6 +1,26 @@
 import type { SupabaseAdminClient } from "@/lib/supabase/admin"
 import type { SupabaseServerClient } from "@/lib/supabase/server"
 import type { Profile } from "@/lib/types"
+import { validateDateOfBirth } from "@/lib/validation"
+
+/** Validates shared personal fields; returns an error message or null. */
+function validateProfileFields(updates: {
+  date_of_birth?: string | null
+  phone?: string
+  full_name?: string
+}): string | null {
+  if (updates.full_name !== undefined && updates.full_name.trim().length < 2) {
+    return "اكتب الاسم بالكامل"
+  }
+  if (updates.phone !== undefined && !/^\+?[0-9]{10,15}$/.test(updates.phone.trim())) {
+    return "اكتب رقم موبايل صحيح (10–15 رقمًا)"
+  }
+  const dobError = validateDateOfBirth(
+    updates.date_of_birth && updates.date_of_birth.length ? updates.date_of_birth : null
+  )
+  if (dobError) return dobError
+  return null
+}
 
 /**
  * Fetches the current user's profile from a server Supabase client.
@@ -58,6 +78,9 @@ export async function updateMyProfile(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: "غير مصرح" }
 
+  const fieldError = validateProfileFields(updates)
+  if (fieldError) return { ok: false, message: fieldError }
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -91,6 +114,9 @@ export async function updateProfileById(
     | "status"
   >
 ): Promise<{ ok: boolean; message: string }> {
+  const fieldError = validateProfileFields(updates)
+  if (fieldError) return { ok: false, message: fieldError }
+
   const { error } = await supabase
     .from("profiles")
     .update({

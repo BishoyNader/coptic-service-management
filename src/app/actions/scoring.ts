@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isAdminRole } from "@/lib/roles"
+import { isUuid } from "@/lib/validation"
 import {
   grantMonthlyActivity,
   getWeeklyEntryState,
@@ -54,7 +55,7 @@ export async function getScoreEntryViewAction(
 ): Promise<ScoreEntryViewResult> {
   const actor = await requireAdminActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
-  if (!profileId || !isDateString(weekDate)) {
+  if (!isUuid(profileId) || !isDateString(weekDate)) {
     return { ok: false, message: "بيانات غير صحيحة" }
   }
   const admin = createAdminClient()
@@ -84,7 +85,7 @@ export async function saveWeeklyScoresAction(
 ): Promise<SaveWeeklyScoresResult> {
   const actor = await requireAdminActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
-  if (!input.profileId || !isDateString(input.weekDate)) {
+  if (!isUuid(input.profileId) || !isDateString(input.weekDate)) {
     return { ok: false, message: "بيانات غير صحيحة" }
   }
 
@@ -115,7 +116,7 @@ export async function grantMonthlyActivityAction(input: {
 }): Promise<SaveWeeklyScoresResult> {
   const actor = await requireAdminActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
-  if (!input.profileId || !isDateString(input.activityDate)) {
+  if (!isUuid(input.profileId) || !isDateString(input.activityDate)) {
     return { ok: false, message: "بيانات غير صحيحة" }
   }
 

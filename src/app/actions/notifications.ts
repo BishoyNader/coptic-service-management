@@ -14,6 +14,7 @@ import {
   type NotificationAudience,
 } from "@/services/notification-service"
 import type { DeliveryChannel } from "@/services/notification-delivery"
+import { isUuid } from "@/lib/validation"
 
 async function requireAdminActor(): Promise<{ adminId: string; role: AppRole } | null> {
   const supabase = await createClient()
@@ -145,6 +146,7 @@ export async function sendNotificationAction(
 export async function markNotificationReadAction(
   recipientId: string
 ): Promise<{ ok: boolean; message: string }> {
+  if (!isUuid(recipientId)) return { ok: false, message: "بيانات غير صحيحة" }
   const supabase = await createClient()
   return markNotificationRead(supabase, recipientId)
 }
@@ -155,10 +157,12 @@ export async function getUnreadCountAction(): Promise<{ count: number }> {
   return { count: await getUnreadCount(supabase) }
 }
 
-/** Server action: get configured delivery channels for the UI. */
+/** Server action: get configured delivery channels for the UI (admin only). */
 export async function getDeliveryChannelsAction(): Promise<
   Array<{ channel: DeliveryChannel; configured: boolean; label: string }>
 > {
+  const actor = await requireAdminActor()
+  if (!actor) return []
   const { getConfiguredChannelsSummary } = await import(
     "@/services/notification-delivery"
   )

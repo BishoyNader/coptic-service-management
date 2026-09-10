@@ -122,13 +122,25 @@ export async function createAdminUser(
 /**
  * Admin change account status (ACTIVE / INACTIVE / ARCHIVED).
  * Never hard-deletes; historical data stays associated with the profile.
+ *
+ * Hierarchy guards (server-side):
+ *  - A plain ADMIN can never change a SUPER_ADMIN account.
+ *  - Nobody can change their OWN status (prevents self-lockout).
  */
 export async function adminChangeStatus(
   admin: SupabaseAdminClient,
   actorId: string,
+  actorRole: AppRole,
   targetId: string,
   status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
 ) {
+  if (!["ACTIVE", "INACTIVE", "ARCHIVED"].includes(status)) {
+    return { ok: false, message: "حالة غير صحيحة" }
+  }
+  if (targetId === actorId) {
+    return { ok: false, message: "لا يمكنك تغيير حالة حسابك بنفسك" }
+  }
+
   const { data: target, error: readError } = await admin
     .from("profiles")
     .select("id, status, full_name, role")
@@ -141,6 +153,10 @@ export async function adminChangeStatus(
 
   if (target.status === status) {
     return { ok: false, message: "الحساب بالفعل بهذه الحالة" }
+  }
+
+  if (target.role === "SUPER_ADMIN" && actorRole !== "SUPER_ADMIN") {
+    return { ok: false, message: "لا يمكن تعديل حساب مسؤول عام من مسؤول خدمة" }
   }
 
   const { error } = await admin.from("profiles").update({ status }).eq("id", targetId)

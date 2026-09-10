@@ -13,19 +13,21 @@ function safeCompare(a: string, b: string): boolean {
 /**
  * GET /api/cron/birthdays — Run the daily birthday automation.
  *
- * Protected by the CRON_SECRET environment variable.
- * In production, call this from a cron scheduler (e.g. Vercel Cron, cron-job.org)
- * with the Authorization header: "Bearer <CRON_SECRET>".
+ * Protected by the CRON_SECRET environment variable, transmitted ONLY via
+ * the `Authorization: Bearer <CRON_SECRET>` header (never a query string, so
+ * the secret can't leak into logs/analytics). In production, call from a cron
+ * scheduler with that header.
  *
- * For local development, call it manually:
- *   curl http://localhost:3000/api/cron/birthdays?secret=YOUR_CRON_SECRET
+ *   curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/birthdays
  *
  * The function is idempotent — running it multiple times on the same day
  * will not duplicate reminders.
  */
 export async function GET(request: Request) {
-  const url = new URL(request.url)
-  const secret = url.searchParams.get("secret") ?? request.headers.get("authorization")?.replace("Bearer ", "")
+  const authorization = request.headers.get("authorization")
+  const secret = authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : null
 
   const expected = process.env.CRON_SECRET
   if (!expected) {

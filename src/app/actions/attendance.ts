@@ -12,6 +12,7 @@ import {
   type AttendanceCorrection,
 } from "@/services/attendance-service"
 import type { AttendanceSource, AttendanceType } from "@/lib/types"
+import { isUuid } from "@/lib/validation"
 
 const VALID_TYPES = Object.keys(ATTENDANCE_TYPE_LABELS) as AttendanceType[]
 
@@ -142,7 +143,7 @@ export async function manualAttendanceAction(
 ): Promise<RecordAttendanceResult> {
   const actor = await requireAdminActor()
   if (!actor) return { status: "error", message: "غير مصرح" }
-  if (!profileId) return { status: "error", message: "اختر الشخص أولًا" }
+  if (!isUuid(profileId)) return { status: "error", message: "بيانات غير صحيحة" }
   if (typeof type !== "string" || !isAttendanceType(type)) {
     return { status: "error", message: "نوع الحضور غير صحيح" }
   }
@@ -184,6 +185,7 @@ export async function correctAttendanceAction(
 ): Promise<CorrectAttendanceResult> {
   const actor = await requireAdminActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(recordId)) return { ok: false, message: "بيانات غير صحيحة" }
   if (actor.role !== ROLES.SUPER_ADMIN) {
     return { ok: false, message: "هذه العملية متاحة لمسؤول عام فقط" }
   }

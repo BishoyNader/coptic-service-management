@@ -269,6 +269,7 @@ export function UsersList({
                   type="button"
                   onClick={() => handleToggle(u)}
                   disabled={pendingId === u.id}
+                  aria-label={u.status === "ACTIVE" ? "إيقاف الحساب" : "تفعيل الحساب"}
                   title={u.status === "ACTIVE" ? "إيقاف الحساب" : "تفعيل الحساب"}
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
@@ -289,6 +290,7 @@ export function UsersList({
                 <button
                   type="button"
                   onClick={() => setArchiveTarget(u)}
+                  aria-label="أرشفة الحساب"
                   title="أرشفة الحساب"
                   className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >

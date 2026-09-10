@@ -121,6 +121,7 @@ export function ManualAttendanceDialog({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                aria-label="ابحث بالاسم أو الموبايل"
                 placeholder="ابحث بالاسم أو الموبايل…"
                 className="w-full rounded-xl border border-input bg-transparent px-4 py-2.5 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
               />
@@ -132,6 +133,7 @@ export function ManualAttendanceDialog({
                 <button
                   key={t}
                   type="button"
+                  aria-pressed={type === t}
                   onClick={() => setType(t)}
                   className={cn(
                     "rounded-lg py-2 text-sm font-medium transition-colors",

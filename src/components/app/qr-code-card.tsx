@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from "qrcode.react"
 import { Copy, Check, Maximize2, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "cn"
 import { CopticCross } from "@/components/coptic/brand"
 import { toast } from "sonner"
@@ -28,6 +28,28 @@ export function QrCodeCard({
 }: QrCodeCardProps) {
   const [copied, setCopied] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    if (!fullscreen) return undefined
+    closeBtnRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false)
+    }
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("keydown", onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [fullscreen])
+
+  const closeFullscreen = () => {
+    setFullscreen(false)
+    triggerRef.current?.focus()
+  }
 
   const copyCode = async () => {
     if (!personalCode) return
@@ -63,6 +85,7 @@ export function QrCodeCard({
         {qrDisplay}
 
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setFullscreen(true)}
           className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -98,12 +121,17 @@ export function QrCodeCard({
       {/* Fullscreen overlay */}
       {fullscreen ? (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="qr-fullscreen-title"
           className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm"
-          onClick={() => setFullscreen(false)}
+          onClick={closeFullscreen}
         >
           <button
+            ref={closeBtnRef}
             type="button"
-            onClick={() => setFullscreen(false)}
+            onClick={closeFullscreen}
+            aria-label="إغلاق"
             className="absolute end-4 top-4 rounded-full bg-secondary p-2 text-muted-foreground hover:text-foreground"
           >
             <X className="size-5" />
@@ -115,7 +143,7 @@ export function QrCodeCard({
             </div>
 
             <div className="text-center space-y-2">
-              <p className="font-heading text-lg font-bold">{name}</p>
+              <p id="qr-fullscreen-title" className="font-heading text-lg font-bold">{name}</p>
               {personalCode ? (
                 <p className="font-heading text-xl font-bold tracking-widest text-muted-foreground">
                   {personalCode}

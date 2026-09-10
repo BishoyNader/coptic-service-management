@@ -146,7 +146,7 @@ export function AdminProfileEdit({
             اطفيه لو المفروض المخدوم يتعطل مؤقتًا
           </p>
         </div>
-        <Switch checked={active} onCheckedChange={setActive} />
+        <Switch aria-label="تفعيل الحساب" checked={active} onCheckedChange={setActive} />
       </div>
 
       <div className="flex gap-2 pt-2">

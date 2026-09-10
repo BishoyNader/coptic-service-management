@@ -143,6 +143,7 @@ export function AttendanceManagement({ records, loadMore }: AttendanceManagement
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="البحث بالاسم"
             placeholder="ابحث بالاسم…"
             className="w-full rounded-xl border border-input bg-transparent px-4 py-2.5 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
           />
@@ -219,19 +220,28 @@ export function AttendanceManagement({ records, loadMore }: AttendanceManagement
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-start text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 text-start font-medium">الاسم</th>
-                  <th className="px-4 py-2.5 text-start font-medium">النوع</th>
-                  <th className="px-4 py-2.5 text-start font-medium">التاريخ والوقت</th>
-                  <th className="px-4 py-2.5 text-start font-medium">النقاط</th>
-                  <th className="px-4 py-2.5 text-start font-medium">الطريقة</th>
-                  <th className="px-4 py-2.5 text-start font-medium">الحالة</th>
+                  <th scope="col" className="px-4 py-2.5 text-start font-medium">الاسم</th>
+                  <th scope="col" className="px-4 py-2.5 text-start font-medium">النوع</th>
+                  <th scope="col" className="px-4 py-2.5 text-start font-medium">التاريخ والوقت</th>
+                  <th scope="col" className="px-4 py-2.5 text-start font-medium">النقاط</th>
+                  <th scope="col" className="px-4 py-2.5 text-start font-medium">الطريقة</th>
+                  <th scope="col" className="px-4 py-2.5 text-start font-medium">الحالة</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((r) => (
                   <tr
                     key={r.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelected(r)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        setSelected(r)
+                      }
+                    }}
+                    aria-label={`تفاصيل سجل ${r.fullName}`}
                     className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40"
                   >
                     <td className="px-4 py-2.5 font-medium">{r.fullName}</td>

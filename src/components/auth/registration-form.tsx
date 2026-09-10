@@ -191,7 +191,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               placeholder="مثال: بشوي نادر حلمي"
             />
             {errors.fullName ? (
-              <p className="text-sm text-destructive">{errors.fullName}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.fullName}</p>
             ) : null}
           </div>
 
@@ -209,7 +209,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               placeholder="01xxxxxxxxx"
             />
             {errors.phone ? (
-              <p className="text-sm text-destructive">{errors.phone}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.phone}</p>
             ) : null}
           </div>
 
@@ -225,7 +225,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               placeholder="8 أحرف على الأقل"
             />
             {errors.password ? (
-              <p className="text-sm text-destructive">{errors.password}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.password}</p>
             ) : null}
           </div>
 
@@ -241,7 +241,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               placeholder="أعد كتابة كلمة المرور"
             />
             {errors.confirmPassword ? (
-              <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.confirmPassword}</p>
             ) : null}
           </div>
         </div>
@@ -260,7 +260,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               className="h-11 text-base"
             />
             {errors.dateOfBirth ? (
-              <p className="text-sm text-destructive">{errors.dateOfBirth}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.dateOfBirth}</p>
             ) : null}
           </div>
 
@@ -277,7 +277,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               placeholder="01xxxxxxxxx"
             />
             {errors.fatherPhone ? (
-              <p className="text-sm text-destructive">{errors.fatherPhone}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.fatherPhone}</p>
             ) : null}
           </div>
 
@@ -294,7 +294,7 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               placeholder="01xxxxxxxxx"
             />
             {errors.motherPhone ? (
-              <p className="text-sm text-destructive">{errors.motherPhone}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.motherPhone}</p>
             ) : null}
           </div>
 
@@ -324,14 +324,14 @@ export function RegistrationForm({ mode }: { mode: Mode }) {
               className="h-11 text-base"
             />
             {errors.dateOfBirth ? (
-              <p className="text-sm text-destructive">{errors.dateOfBirth}</p>
+              <p role="alert" className="text-sm text-destructive">{errors.dateOfBirth}</p>
             ) : null}
           </div>
         </div>
       )}
 
       {generalError ? (
-        <p className="flex items-start gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p role="alert" className="flex items-start gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           {generalError}
         </p>
