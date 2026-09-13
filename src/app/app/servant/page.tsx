@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { QrCode, History, Bell, ClipboardList } from "lucide-react"
+import { QrCode, History, Bell, ClipboardList, CalendarCheck, Users, HandHelping } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
+import { getServerNow } from "@/services/attendance-service"
+import { cairoDateString } from "@/lib/cairo"
 import { formatArabicDate, toDateString, startOfMonth } from "@/lib/dates"
 import { NileDivider } from "@/components/coptic/brand"
 import { QrCodeCard } from "@/components/app/qr-code-card"
@@ -19,33 +21,43 @@ export default async function ServantHomePage({
 
   const { welcome } = (await searchParams) ?? {}
 
-  const [codesResult, attendanceResult, activityResult, notifResult] = await Promise.all([
-    supabase
-      .from("personal_codes")
-      .select("code, qr_token")
-      .eq("profile_id", profile.id)
-      .maybeSingle(),
-    supabase
-      .from("attendance_records")
-      .select("attended_at")
-      .eq("profile_id", profile.id)
-      .in("status", ["PRESENT", "LATE"])
-      .order("attended_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("servant_activity_records")
-      .select("id, recorded_on, activity:activities(name, icon)")
-      .eq("servant_id", profile.id)
-      .gte("recorded_on", toDateString(startOfMonth()))
-      .order("recorded_on", { ascending: false })
-      .limit(3),
-    supabase
-      .from("notification_recipients")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profile.id)
-      .is("read_at", null),
-  ])
+  const today = cairoDateString(getServerNow())
+
+  const [codesResult, attendanceResult, activityResult, notifResult, todayResult] =
+    await Promise.all([
+      supabase
+        .from("personal_codes")
+        .select("code, qr_token")
+        .eq("profile_id", profile.id)
+        .maybeSingle(),
+      supabase
+        .from("attendance_records")
+        .select("attended_at")
+        .eq("profile_id", profile.id)
+        .in("status", ["PRESENT", "LATE"])
+        .order("attended_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("servant_activity_records")
+        .select("id, recorded_on, activity:activities(name, icon)")
+        .eq("servant_id", profile.id)
+        .gte("recorded_on", toDateString(startOfMonth()))
+        .order("recorded_on", { ascending: false })
+        .limit(3),
+      supabase
+        .from("notification_recipients")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .is("read_at", null),
+      supabase
+        .from("attendance_records")
+        .select(
+          "profile_id, subject:profiles!attendance_records_profile_id_fkey(role)"
+        )
+        .eq("session.session_date", today)
+        .neq("status", "ARCHIVED"),
+    ])
 
   const lastAttendance = attendanceResult.data?.attended_at ?? null
   const activities = activityResult.data as unknown as {
@@ -54,6 +66,22 @@ export default async function ServantHomePage({
     activity: { name: string; icon: string | null } | null
   }[]
   const unread = notifResult.count ?? 0
+
+  const todayRows = (todayResult.data ?? []) as unknown as {
+    profile_id: string
+    subject: { role: string } | null
+  }[]
+  const todaySubjects = new Map<string, string>()
+  for (const row of todayRows) {
+    const role = row.subject?.role
+    if (role === "SERVANT" || role === "SERVED_MEMBER") todaySubjects.set(row.profile_id, role)
+  }
+  let todayServants = 0
+  let todayMembers = 0
+  for (const [, role] of todaySubjects) {
+    if (role === "SERVANT") todayServants++
+    else todayMembers++
+  }
 
   if (welcome && codesResult.data) {
     return (
@@ -101,6 +129,34 @@ export default async function ServantHomePage({
             <p className="font-heading text-lg font-bold">كود الخادم</p>
             <p className="text-sm text-primary-foreground/85">يعرّفك بين الخدام في الخدمة</p>
           </div>
+        </div>
+      </Link>
+
+      {/* Attendance board widget */}
+      <Link
+        href="/app/servant/attendance"
+        aria-label="فتح لوحة الحضور"
+        className="block rounded-3xl bg-card p-5 shadow-md ring-1 ring-foreground/5 transition-colors hover:bg-secondary/40"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-coptic-gold-soft text-coptic-gold">
+              <CalendarCheck className="size-5" />
+            </span>
+            <p className="font-heading font-bold">حضور اليوم</p>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-medium text-coptic-teal">
+            فتح الحضور
+            <span aria-hidden="true" className="text-sm">←</span>
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <MiniStat
+            icon={<HandHelping className="size-4" />}
+            label="خدام"
+            value={todayServants}
+          />
+          <MiniStat icon={<Users className="size-4" />} label="مخدومين" value={todayMembers} />
         </div>
       </Link>
 
@@ -171,6 +227,26 @@ export default async function ServantHomePage({
 
       <NileDivider />
       <p className="text-center text-xs text-muted-foreground">يحيا المسيح 🕊️</p>
+    </div>
+  )
+}
+
+function MiniStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-secondary/50 px-3 py-2.5">
+      <span className="text-coptic-teal">{icon}</span>
+      <div className="flex items-baseline gap-1.5">
+        <p className="font-heading text-lg font-extrabold leading-none text-foreground">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
     </div>
   )
 }

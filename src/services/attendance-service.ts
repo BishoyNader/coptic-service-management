@@ -281,19 +281,35 @@ async function executeCheckIn(
     }
   }
 
+  const attendedAt = now.toISOString()
   const auditAction = source === "MANUAL" ? "ATTENDANCE_MANUAL" : "ATTENDANCE_CHECKIN"
+  // Successful recording is audited exactly once, post-commit via the
+  // service-role client — the same convention as ATTENDANCE_VOIDED and
+  // ATTENDANCE_CORRECTED. The actor is the authenticated server session;
+  // the subject (person whose attendance was recorded) and its role are
+  // captured in metadata so self vs cross-person recording is unambiguous.
+  // Duplicate attempts never reach this point, so they add no audit rows.
   await logAudit(admin, {
     actorId,
     action: auditAction,
     entity: "ATTENDANCE",
     entityId: result.id,
-    metadata: { type, source, points, session_id: sessionId },
+    metadata: {
+      profile_id: person.id,
+      subject_role: person.role,
+      attended_at: attendedAt,
+      type,
+      source,
+      points,
+      session_id: sessionId,
+      outcome: "success",
+    },
   })
 
   return {
     status: "success",
     person: personToOutcome(person),
-    attendedAt: now.toISOString(),
+    attendedAt,
     cairoTime: cairoTimeString(now),
     type,
     source,

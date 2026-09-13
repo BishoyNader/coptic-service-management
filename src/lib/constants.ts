@@ -20,6 +20,7 @@ export const MEMBER_NAV: NavItem[] = [
 
 export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant", label: "الرئيسية", icon: "home" },
+  { href: "/app/servant/attendance", label: "الحضور", icon: "scan" },
   { href: "/app/servant/qr", label: "QR", icon: "qr" },
   { href: "/app/servant/activities", label: "الأنشطة", icon: "clipboard" },
   { href: "/app/servant/notifications", label: "الإشعارات", icon: "bell" },
