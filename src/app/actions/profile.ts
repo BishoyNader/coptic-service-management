@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { updateMyProfile, updateProfileById } from "@/services/profile-service"
+import { updateMyProfile, updateProfileById, updateServantManagedDob } from "@/services/profile-service"
 import {
   createAdminUser,
   adminChangeStatus,
@@ -105,6 +105,56 @@ export async function adminUpdateStatusAction(
   }
 
   return adminChangeStatus(admin, user.id, adminProfile.role as AppRole, id, status)
+}
+
+/**
+ * Servant: updates an ACTIVE SERVED_MEMBER's date of birth.
+ *
+ * The caller's identity and role are resolved server-side from the session —
+ * never trusted from the client. Only the `date_of_birth` column is mutated
+ * and only for an ACTIVE SERVED_MEMBER target, mirroring the existing
+ * role-scoped member-management authorization model.
+ */
+export async function servantUpdateMemberDobAction(payload: {
+  profileId: string
+  dateOfBirth: string
+}) {
+  const supabase = await createClient()
+  const admin = createAdminClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(payload.profileId)) return { ok: false, message: "بيانات غير صحيحة" }
+
+  const { data: actorProfile } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!actorProfile || actorProfile.role !== ROLES.SERVANT) {
+    return { ok: false, message: "غير مصرح" }
+  }
+
+  const result = await updateServantManagedDob(
+    admin,
+    { id: actorProfile.id as string, role: actorProfile.role as string },
+    payload.profileId,
+    payload.dateOfBirth || null
+  )
+
+  if (result.ok) {
+    await logAudit(admin, {
+      actorId: user.id,
+      action: "PROFILE_UPDATED",
+      entity: "PROFILE",
+      entityId: payload.profileId,
+      metadata: { updatedBy: user.id, scope: "SERVANT_MANAGED_DOB", dateOfBirth: payload.dateOfBirth || null },
+    }).catch(() => {})
+  }
+
+  return result
 }
 
 type AdminCreateUserActionPayload = {

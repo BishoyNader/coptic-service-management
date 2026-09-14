@@ -82,7 +82,7 @@ export function BrandMark({
           كنيسة الخدمة
         </p>
         <p className="text-[11px] font-medium text-muted-foreground">
-          كنيسة القديسين للخدمات
+          كنيسة السيدة العذراء وأي حوف
         </p>
       </div>
     </div>

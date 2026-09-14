@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Cairo, Amiri } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
+import { APP_NAME, APP_TAGLINE } from "@/lib/constants"
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -16,10 +17,10 @@ const amiri = Amiri({
 
 export const metadata: Metadata = {
   title: {
-    default: "خدمتي — إدارة الخدمة",
-    template: "%s | خدمتي",
+    default: `${APP_NAME} — إدارة الخدمة`,
+    template: `%s | ${APP_NAME}`,
   },
-  description: "تطبيق إدارة الخدمة لكنيسة القديسين للخدمات",
+  description: `تطبيق إدارة الخدمة ل${APP_TAGLINE}`,
 }
 
 export const viewport: Viewport = {

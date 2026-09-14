@@ -1,7 +1,7 @@
 import type { AppRole } from "./roles"
 
 export const APP_NAME = "خدمتي"
-export const APP_TAGLINE = "كنيسة القديسين للخدمات"
+export const APP_TAGLINE = "كنيسة السيدة العذراء وأي حوف"
 
 /** App navigation configuration per role. */
 export type NavItem = {
@@ -23,6 +23,8 @@ export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant/attendance", label: "الحضور", icon: "scan" },
   { href: "/app/servant/qr", label: "QR", icon: "qr" },
   { href: "/app/servant/activities", label: "الأنشطة", icon: "clipboard" },
+  { href: "/app/servant/members", label: "المخدومين", icon: "users" },
+  { href: "/app/servant/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/servant/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/servant/account", label: "حسابي", icon: "user" },
 ]

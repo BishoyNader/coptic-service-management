@@ -1,5 +1,6 @@
 import type { SupabaseAdminClient } from "@/lib/supabase/admin"
 import { cairoDateString } from "@/lib/cairo"
+import type { AppRole } from "@/lib/roles"
 import { logAudit } from "@/services/auth-service"
 import {
   BIRTHDAY_GREETING_TITLE,
@@ -70,6 +71,17 @@ export async function runBirthdayAutomation(
 
   // Check which birthdays already have reminders for this date
   const profileIds = eligible.map((b: { profile_id: string }) => b.profile_id)
+
+  // Resolve each subject's role so the notification audience matches the
+  // actual recipient (SERVANT or SERVED_MEMBER).
+  const { data: subjectRoles } = await admin
+    .from("profiles")
+    .select("id, role")
+    .in("id", profileIds)
+  const roleById = new Map(
+    (subjectRoles ?? []).map((r) => [r.id as string, r.role as unknown as AppRole])
+  )
+
   const { data: existingReminders } = await admin
     .from("birthday_reminders")
     .select("profile_id")
@@ -86,6 +98,7 @@ export async function runBirthdayAutomation(
     const pid = birthday.profile_id as string
     const name = birthday.full_name as string
     const phone = birthday.phone as string | null
+    const subjectRole: AppRole = roleById.get(pid) ?? "SERVED_MEMBER"
 
     // Skip if already sent
     if (alreadySent.has(pid)) continue
@@ -97,7 +110,7 @@ export async function runBirthdayAutomation(
         .insert({
           title: BIRTHDAY_GREETING_TITLE,
           body: birthdayGreetingBody(name),
-          audience: ["SERVED_MEMBER"],
+          audience: [subjectRole],
           sender_id: senderId,
         })
         .select("id")
@@ -169,6 +182,7 @@ export async function runBirthdayAutomation(
         metadata: {
           memberId: pid,
           memberName: name,
+          memberRole: subjectRole,
           reminderFor: targetDate,
           notificationId,
           automated: true,

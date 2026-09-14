@@ -133,3 +133,51 @@ export async function updateProfileById(
   if (error) return { ok: false, message: "حدث خطأ أثناء الحفظ" }
   return { ok: true, message: "تم تحديث البيانات بنجاح ✓" }
 }
+
+/**
+ * Servant: updates the date of birth of an ACTIVE SERVED_MEMBER.
+ *
+ * Authorization boundaries:
+ * - Only SERVANT role may call this.
+ * - Target must be an ACTIVE SERVED_MEMBER.
+ * - Only `date_of_birth` is mutable — no other fields.
+ * - The update is performed via a service-role client to bypass RLS,
+ *   but all authorization checks are enforced server-side before the write.
+ */
+export async function updateServantManagedDob(
+  admin: SupabaseAdminClient,
+  actorProfile: { id: string; role: string },
+  targetId: string,
+  dateOfBirth: string | null
+): Promise<{ ok: boolean; message: string }> {
+  if (actorProfile.role !== "SERVANT") {
+    return { ok: false, message: "غير مصرح" }
+  }
+
+  const dobError = validateDateOfBirth(dateOfBirth && dateOfBirth.length ? dateOfBirth : null)
+  if (dobError) return { ok: false, message: dobError }
+
+  const { data: target, error: targetError } = await admin
+    .from("profiles")
+    .select("id, role, status")
+    .eq("id", targetId)
+    .maybeSingle()
+
+  if (targetError || !target) {
+    return { ok: false, message: "المخدوم غير موجود" }
+  }
+  if (target.role !== "SERVED_MEMBER") {
+    return { ok: false, message: "يمكن تحديث تاريخ ميلاد المخدومين فقط" }
+  }
+  if (target.status !== "ACTIVE") {
+    return { ok: false, message: "الحساب غير نشط" }
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ date_of_birth: dateOfBirth || null })
+    .eq("id", targetId)
+
+  if (error) return { ok: false, message: "حدث خطأ أثناء الحفظ" }
+  return { ok: true, message: "تم تحديث تاريخ الميلاد بنجاح ✓" }
+}

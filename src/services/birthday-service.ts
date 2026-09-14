@@ -50,19 +50,23 @@ function cleanText(value: string): string {
 }
 
 /**
- * Upcoming ACTIVE served-member birthdays within the 30-day window.
+ * Upcoming ACTIVE birthdays within the 30-day window for one or more roles.
  * Computed entirely on the server (month/day comparison in the Cairo
  * calendar, leap-year aware); the client only ever receives the rows.
+ *
+ * Defaults to SERVED_MEMBER to preserve the admin/super-admin 30-day board
+ * contract. Servant-facing pages query each category separately.
  */
 export async function getUpcomingBirthdays(
-  supabase: SupabaseServerClient
+  supabase: SupabaseServerClient,
+  roles: AppRole[] = [ROLES.SERVED_MEMBER]
 ): Promise<UpcomingBirthday[]> {
   const today = cairoDateString(new Date())
 
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, full_name, date_of_birth")
-    .eq("role", ROLES.SERVED_MEMBER)
+    .in("role", roles)
     .eq("status", "ACTIVE")
     .not("date_of_birth", "is", null)
     .limit(1000)

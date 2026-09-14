@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { CopticBadge } from "@/components/coptic/brand"
+import { APP_NAME, APP_TAGLINE } from "@/lib/constants"
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,10 +12,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <header className="relative z-10 flex items-center gap-2.5 px-5 pt-6">
         <CopticBadge className="size-10" />
         <div className="leading-tight">
-          <p className="font-heading text-lg font-bold">خدمتي</p>
-          <p className="text-[11px] text-muted-foreground">
-            كنيسة القديسين للخدمات
-          </p>
+          <p className="font-heading text-lg font-bold">{APP_NAME}</p>
+          <p className="text-[11px] text-muted-foreground">{APP_TAGLINE}</p>
         </div>
       </header>
 
