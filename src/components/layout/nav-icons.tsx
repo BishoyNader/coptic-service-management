@@ -14,6 +14,7 @@ import {
   HeartHandshake,
   ClipboardList,
   Menu,
+  Activity,
   type LucideIcon,
 } from "lucide-react"
 
@@ -32,6 +33,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   history: History,
   settings: Settings,
   clipboard: ClipboardList,
+  activity: Activity,
   menu: Menu,
 }
 

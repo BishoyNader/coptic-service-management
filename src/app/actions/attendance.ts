@@ -174,6 +174,7 @@ export async function manualAttendanceAction(
     profileId,
     type,
   })
+  console.log("[attendance.manualAttendanceAction]", { profileId, type, status: outcome.status, message: outcome.status === "error" ? outcome.message : undefined })
 
   if (outcome.status === "error") return outcome
   if (outcome.status === "success") {

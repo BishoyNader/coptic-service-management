@@ -7,7 +7,8 @@ import type {
   UserStatus,
 } from "@/lib/types"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
-import { cairoDateString, cairoTimeString } from "@/lib/cairo"
+import { cairoDateString, cairoLocalToInstant, cairoTimeString } from "@/lib/cairo"
+import { ROLES } from "@/lib/roles"
 import { logAudit } from "./auth-service"
 import {
   attendanceCategory,
@@ -561,4 +562,103 @@ export async function correctAttendance(
   })
 
   return { ok: true, message: "تم تصحيح الحضور" }
+}
+
+/** Servant-side default of the day for each type (window start ⇒ full band). */
+const CHILD_ATTENDANCE_DEFAULT_TIMES: Record<AttendanceType, string> = {
+  CHURCH: "07:00",
+  SERVICE: "10:30",
+}
+
+/**
+ * A servant records a child's (ACTIVE served member) attendance for a chosen
+ * Cairo date (today or earlier). The instant is reconstructed server-side
+ * from the chosen date plus each type's default time-of-day (window start),
+ * so the entry resolves deterministically to the full attendance band. The
+ * stale `now` interpretation is intentional: a record-keeping entry, not a
+ * live check-in — the server, never the client, pins the time.
+ */
+export async function recordChildAttendance(
+  admin: SupabaseAdminClient,
+  params: {
+    actorId: string
+    memberId: string
+    type: AttendanceType
+    date: string
+  }
+): Promise<CheckInOutcome> {
+  const { actorId, memberId, type, date } = params
+
+  const person = await resolvePersonByProfileId(admin, memberId)
+  if (!person) return { status: "error", message: "الشخص غير موجود" }
+  if (person.role !== ROLES.SERVED_MEMBER) {
+    return { status: "error", message: "السجلات تُكتب للمخدومين فقط" }
+  }
+  if (person.status !== "ACTIVE") {
+    return { status: "error", message: "هذا الحساب غير نشط" }
+  }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { status: "error", message: "التاريخ غير صحيح" }
+  }
+  const cairoToday = cairoDateString(getServerNow())
+  if (date > cairoToday) {
+    return { status: "error", message: "لا يمكن تسجيل حضور في تاريخ مستقبلي" }
+  }
+
+  return executeCheckIn(admin, {
+    actorId,
+    person,
+    type,
+    source: "MANUAL",
+    now: cairoLocalToInstant(date, CHILD_ATTENDANCE_DEFAULT_TIMES[type]),
+  })
+}
+
+/**
+ * A servant may undo an attendance record THEY created for a child. The
+ * linked auto-derived score row is removed by cascade, so weekly/monthly
+ * totals recompute from the remaining attendance-engine rows.
+ */
+export async function removeServantChildAttendance(
+  admin: SupabaseAdminClient,
+  params: { actorId: string; recordId: string }
+): Promise<{ ok: boolean; message: string }> {
+  const { actorId, recordId } = params
+
+  const { data: row } = await admin
+    .from("attendance_records")
+    .select("id, recorded_by, profile_id")
+    .eq("id", recordId)
+    .maybeSingle()
+
+  if (!row) return { ok: false, message: "سجل الحضور غير موجود" }
+  if (row.recorded_by !== actorId) {
+    return { ok: false, message: "لا يمكن حذف تسجيلة سجلها شخص آخر" }
+  }
+
+  const { data: targetProfile } = await admin
+    .from("profiles")
+    .select("id, role")
+    .eq("id", row.profile_id ?? "")
+    .maybeSingle()
+
+  if (!targetProfile || targetProfile.role !== ROLES.SERVED_MEMBER) {
+    return { ok: false, message: "السجلات تُكتب للمخدومين فقط" }
+  }
+
+  const { error } = await admin.from("attendance_records").delete().eq("id", recordId)
+  if (error) return { ok: false, message: "تعذر حذف سجل الحضور" }
+
+  await logAudit(admin, {
+    actorId,
+    action: "ATTENDANCE_REMOVED",
+    entity: "ATTENDANCE",
+    entityId: recordId,
+    metadata: {
+      profile_id: targetProfile.id,
+      removed_by_servant: true,
+    },
+  })
+
+  return { ok: true, message: "تم حذف تسجيل الحضور" }
 }

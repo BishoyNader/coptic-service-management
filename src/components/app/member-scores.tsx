@@ -5,44 +5,64 @@ import {
   Church,
   Croissant,
   Flame,
+  GraduationCap,
   HandHeart,
   Heart,
+  HeartHandshake,
+  Home,
+  Scissors,
   Shirt,
   Star,
   type LucideIcon,
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/coptic/empty-state"
+import { formatArabicDate } from "@/lib/dates"
 import type { ScoreBreakdown, ScoreBreakdownEntry } from "@/services/scoring-rules"
-import { SCORE_CATEGORY_ICONS } from "@/services/scoring-rules"
+import type { MemberActivityView, MemberActivityDayEntry } from "@/services/member-scoring-service"
 
 const ICONS: Record<string, LucideIcon> = {
   church: Church,
+  Church,
   heart: Heart,
   shirt: Shirt,
+  Shirt,
   bread: Croissant,
   flame: Flame,
   hand: HandHeart,
   star: Star,
+  Star,
   calendar: CalendarDays,
+  BookOpen: GraduationCap,
+  GraduationCap,
+  HeartHandshake,
+  Home,
+  Scissors,
 }
 
 export function MemberScoresView({
   week,
   month,
+  activity,
 }: {
   week: ScoreBreakdown
   month: ScoreBreakdown
+  activity: MemberActivityView | null
 }) {
   return (
     <div className="space-y-5">
       <div className="space-y-1">
         <h1 className="font-heading text-xl font-extrabold">درجاتي</h1>
-        <p className="text-sm text-muted-foreground">تفاصيل نقاط الخدمة الأسبوعية والشهرية</p>
+        <p className="text-sm text-muted-foreground">درجة اليوم وكل الأنشطة والأسابيع</p>
       </div>
 
-      <Tabs defaultValue="week" className="w-full">
+      <Tabs defaultValue={activity && activity.entries.length > 0 ? "activity" : "week"} className="w-full">
         <TabsList className="w-full">
+          {activity && activity.entries.length > 0 ? (
+            <TabsTrigger value="activity" className="flex-1">
+              نشاط اليوم
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="week" className="flex-1">
             هذا الأسبوع
           </TabsTrigger>
@@ -50,6 +70,12 @@ export function MemberScoresView({
             هذا الشهر
           </TabsTrigger>
         </TabsList>
+
+        {activity && activity.entries.length > 0 ? (
+          <TabsContent value="activity" className="mt-4">
+            <ActivityPanel view={activity} />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="week" className="mt-4">
           <PeriodPanel breakdown={week} emptyText="لسه مفيش درجات للأسبوع ده" />
@@ -60,6 +86,92 @@ export function MemberScoresView({
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+/** Today + all-time activity grading, with a live percentage per activity. */
+function ActivityPanel({ view }: { view: MemberActivityView }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-center text-xs text-muted-foreground">
+        {formatArabicDate(view.date)} — درجة اليوم ونسبتها
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-foreground/5">
+          <p className="text-[11px] text-muted-foreground">درجة اليوم</p>
+          <p className="mt-1 font-heading text-xl font-extrabold text-coptic-teal">
+            {view.today_points} <span className="text-sm text-muted-foreground">/ {view.today_max}</span>
+          </p>
+          <PercentBadge percent={view.today_percent} />
+        </div>
+        <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-foreground/5">
+          <p className="text-[11px] text-muted-foreground">الإجمالي الكلي</p>
+          <p className="mt-1 font-heading text-xl font-extrabold text-coptic-gold">
+            {view.grand_total} <span className="text-sm text-muted-foreground">نقطة</span>
+          </p>
+          <PercentBadge percent={view.total_percent} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {view.entries.map((entry) => (
+          <ActivityRow key={entry.activity_id} entry={entry} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ActivityRow({ entry }: { entry: MemberActivityDayEntry }) {
+  const Icon = entry.icon ? ICONS[entry.icon] : Star
+  const todayPct = entry.max_score > 0 ? Math.round((entry.points_today / entry.max_score) * 100) : 0
+  return (
+    <div className="rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+        <p className="min-w-0 flex-1 truncate text-sm font-medium">{entry.name}</p>
+        <TodayChip points={entry.points_today} max={entry.max_score} pct={todayPct} />
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span>الكلي: <b className="text-coptic-teal">{entry.points_total} نقطة</b></span>
+        <span>· {entry.days_active} يوم تقييم</span>
+        <span className="ms-auto">المدى {entry.min_score}–{entry.max_score}</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full bg-coptic-teal"
+          style={{ width: `${todayPct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function TodayChip({ points, max, pct }: { points: number; max: number; pct: number }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1 rounded-full bg-coptic-teal/10 px-2.5 py-1 text-[11px] font-bold text-coptic-teal">
+      {points} / {max}
+      <span className="text-coptic-gold">· {pct}%</span>
+    </span>
+  )
+}
+
+function PercentBadge({ percent }: { percent: number }) {
+  const tone =
+    percent >= 80
+      ? "bg-coptic-teal/15 text-coptic-teal"
+      : percent >= 50
+        ? "bg-coptic-gold-soft/40 text-coptic-gold"
+        : "bg-destructive/10 text-destructive"
+  return (
+    <span
+      className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tone}`}
+    >
+      {percent}%
+    </span>
   )
 }
 

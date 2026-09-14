@@ -101,3 +101,36 @@ export function daysAgoUtcISO(days: number): string {
   d.setUTCDate(d.getUTCDate() - days)
   return d.toISOString()
 }
+
+/**
+ * The UTC instant whose Cairo wall-clock time equals the given civil date
+ * ("YYYY-MM-DD") and time ("HH:MM"). DST-aware: Egypt applies DST, so the
+ * offset is derived from Intl rather than hardcoded. Used to reconstruct
+ * historical attendance instants (e.g. a servant recording a child's
+ * attendance for an earlier day) while keeping the attendance engine's
+ * wall-time semantics exact. The result is pinned by fixed-point iteration —
+ * offset(instant) is piecewise constant, so this converges in one or two
+ * passes.
+ */
+export function cairoLocalToInstant(date: string, time: string): Date {
+  const [y, mo, d] = date.split("-").map(Number)
+  const [h, mi] = (time || "00:00").split(":").map(Number)
+  const wallMs = Date.UTC(y, mo - 1, d, h || 0, mi || 0, 0, 0)
+
+  let instant = wallMs
+  for (let i = 0; i < 4; i++) {
+    const wall = cairoParts(new Date(instant))
+    const wallMsOfInstant = Date.UTC(
+      wall.year,
+      wall.month - 1,
+      wall.day,
+      wall.hour,
+      wall.minute,
+      wall.second
+    )
+    const next = wallMs - (wallMsOfInstant - instant)
+    if (next === instant) break
+    instant = next
+  }
+  return new Date(instant)
+}

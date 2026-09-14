@@ -109,8 +109,20 @@ export type Activity = {
   name: string
   icon: string | null
   for_role: AppRole
+  min_score: number
+  max_score: number
   is_active: boolean
   sort_order: number
+  created_at: string
+}
+
+export type MemberActivityScore = {
+  id: string
+  profile_id: string
+  activity_id: string
+  score_date: string
+  points: number
+  recorded_by: string | null
   created_at: string
 }
 
