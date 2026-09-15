@@ -105,6 +105,7 @@ export type RecordAttendanceResult = {
   type?: AttendanceType
   source?: AttendanceSource
   points?: number
+  ruleName?: string
 }
 
 /**
@@ -141,6 +142,7 @@ export async function recordAttendanceAction(
       type: outcome.type,
       source: outcome.source,
       points: outcome.points,
+      ruleName: outcome.ruleName,
     }
   }
   return {
@@ -186,6 +188,7 @@ export async function manualAttendanceAction(
       type: outcome.type,
       source: outcome.source,
       points: outcome.points,
+      ruleName: outcome.ruleName,
     }
   }
   return {

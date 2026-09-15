@@ -37,12 +37,12 @@ function makeRule(
   }
 }
 
-/** Mirror of the production seeding (see initial_schema.sql). */
+/** Mirror of the production seeding (see 20260920000000_attendance_divisions.sql). */
 const RULES: ScoringRule[] = [
-  makeRule("c1", "CHURCH_ATTENDANCE", 10, "07:00", "08:00", 10),
-  makeRule("c2", "CHURCH_ATTENDANCE", 8, "08:00", "08:15", 20),
-  makeRule("c3", "CHURCH_ATTENDANCE", 5, "08:15", "08:30", 30),
-  makeRule("c4", "CHURCH_ATTENDANCE", 3, "08:30", "09:30", 40),
+  makeRule("c1", "CHURCH_ATTENDANCE", 10, "07:00", "07:45", 10),
+  makeRule("c2", "CHURCH_ATTENDANCE", 8, "07:45", "08:15", 20),
+  makeRule("c3", "CHURCH_ATTENDANCE", 6, "08:15", "08:40", 30),
+  makeRule("c4", "CHURCH_ATTENDANCE", 4, "08:40", "09:40", 40),
   makeRule("s1", "SERVICE_ATTENDANCE", 10, "10:30", "11:00", 10),
   makeRule("s2", "SERVICE_ATTENDANCE", 5, "11:00", null, 20),
 ]
@@ -86,33 +86,34 @@ function expectWindow(
 }
 
 test.describe("Attendance scoring bands (Cairo wall clock)", () => {
-  test("church: 07:00-08:00 → 10 points", () => {
+  test("church: باكر 07:00-07:45 → 10 points", () => {
     expectWindow("CHURCH", 7, 0, 10)
     expectWindow("CHURCH", 7, 30, 10)
-    expectWindow("CHURCH", 7, 59, 10)
+    expectWindow("CHURCH", 7, 44, 10)
   })
 
-  test("church: 08:00-08:15 → 8 points", () => {
+  test("church: تقديم الحمل 07:45-08:15 → 8 points", () => {
+    expectWindow("CHURCH", 7, 45, 8)
     expectWindow("CHURCH", 8, 0, 8)
-    expectWindow("CHURCH", 8, 7, 8)
     expectWindow("CHURCH", 8, 14, 8)
   })
 
-  test("church: 08:15-08:30 → 5 points", () => {
-    expectWindow("CHURCH", 8, 15, 5)
-    expectWindow("CHURCH", 8, 29, 5)
+  test("church: تحليل الخدام 08:15-08:40 → 6 points", () => {
+    expectWindow("CHURCH", 8, 15, 6)
+    expectWindow("CHURCH", 8, 30, 6)
+    expectWindow("CHURCH", 8, 39, 6)
   })
 
-  test("church: 08:30-09:30 → 3 points", () => {
-    expectWindow("CHURCH", 8, 30, 3)
-    expectWindow("CHURCH", 9, 0, 3)
-    expectWindow("CHURCH", 9, 29, 3)
+  test("church: الإنجيل 08:40-09:40 → 4 points", () => {
+    expectWindow("CHURCH", 8, 40, 4)
+    expectWindow("CHURCH", 9, 0, 4)
+    expectWindow("CHURCH", 9, 39, 4)
   })
 
-  test("church: before 07:00 and after 09:30 → 0 points", () => {
+  test("church: before 07:00 and after 09:40 → 0 points", () => {
     expectWindow("CHURCH", 6, 59, 0)
     expectWindow("CHURCH", 5, 0, 0)
-    expectWindow("CHURCH", 9, 30, 0)
+    expectWindow("CHURCH", 9, 40, 0)
     expectWindow("CHURCH", 12, 0, 0)
     expectWindow("CHURCH", 18, 0, 0)
   })

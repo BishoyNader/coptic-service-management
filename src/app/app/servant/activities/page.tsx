@@ -24,7 +24,6 @@ export default async function ServantActivitiesPage() {
     supabase
       .from("activities")
       .select("id, name, icon, sort_order")
-      .eq("for_role", ROLES.SERVANT)
       .eq("is_active", true)
       .order("sort_order", { ascending: true }),
     supabase

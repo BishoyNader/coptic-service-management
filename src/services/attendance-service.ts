@@ -68,6 +68,8 @@ export type CheckInOutcome =
       type: AttendanceType
       source: AttendanceSource
       points: number
+      /** Name of the matched scoring band (e.g. "باكر"), when one applied. */
+      ruleName?: string
     }
   | {
       status: "duplicate"
@@ -315,6 +317,7 @@ async function executeCheckIn(
     type,
     source,
     points,
+    ruleName: resolution.rule?.name,
   }
 }
 

@@ -566,9 +566,16 @@ function SuccessCard({
             خادم — تسجيل حضور بدون نقاط
           </p>
         ) : (result.points ?? 0) > 0 ? (
-          <p className="font-heading text-xl font-extrabold text-coptic-gold">
-            +{result.points} نقطة
-          </p>
+          <div className="space-y-0.5">
+            {result.ruleName ? (
+              <p className="font-heading text-lg font-extrabold text-coptic-gold">
+                {result.ruleName}
+              </p>
+            ) : null}
+            <p className="font-heading text-xl font-extrabold text-coptic-gold">
+              +{result.points} نقطة
+            </p>
+          </div>
         ) : (
           <p className="text-xs text-primary-foreground/75">
             تم التسجيل خارج نطاق نقاط الحضور
