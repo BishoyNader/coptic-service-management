@@ -7,6 +7,7 @@ import { ROLES } from "@/lib/roles"
 import { getMemberScoreView } from "@/services/scoring-service"
 import { getMemberActivityView } from "@/services/member-scoring-service"
 import { cairoDateString } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
 import { MemberScoresView } from "@/components/app/member-scores"
 
 export const metadata: Metadata = { title: "الدرجات" }
@@ -21,9 +22,10 @@ export default async function MemberScoresPage() {
   // The activity view (today + all-time per activity + percentage) reads the
   // member's own grading rows through the admin client under the page's role
   // gate, keyed strictly to this profile.
+  const now = getServerNow()
   const [scoreView, activity] = await Promise.all([
-    getMemberScoreView(supabase, profile.id),
-    getMemberActivityView(createAdminClient(), profile.id, cairoDateString(new Date())),
+    getMemberScoreView(supabase, profile.id, now),
+    getMemberActivityView(createAdminClient(), profile.id, cairoDateString(now)),
   ])
   return <MemberScoresView week={scoreView.week} month={scoreView.month} activity={activity} />
 }

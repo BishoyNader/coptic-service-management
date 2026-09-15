@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { cairoDateString } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
 import { getServantDayData } from "@/services/servant-day-service"
 import { getScoringBoardData } from "@/services/member-scoring-service"
 import { ServantActivitiesHub, type HubServant } from "@/components/app/servant-activities-hub"
@@ -22,7 +23,7 @@ export default async function ServantActivitiesPage() {
   }
 
   const admin = createAdminClient()
-  const todayInstant = new Date()
+  const todayInstant = getServerNow()
   const cairoToday = cairoDateString(todayInstant)
   const minDate = cairoDateString(new Date(todayInstant.getTime() - MIN_DATE_DAYS * 86_400_000))
   const historySince = cairoDateString(

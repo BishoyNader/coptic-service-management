@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { ROLES } from "@/lib/roles"
 import { logAudit } from "@/services/auth-service"
 import { cairoDateString } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
 import { isUuid } from "@/lib/validation"
 import { getServantDayData, type ServantDayData } from "@/services/servant-day-service"
 
@@ -91,7 +92,7 @@ export async function recordServantActivityAction(
     return { ok: false, message: "التاريخ غير صحيح" }
   }
 
-  const cairoToday = cairoDateString(new Date())
+  const cairoToday = cairoDateString(getServerNow())
   if (date > cairoToday) {
     return { ok: false, message: "لا يمكن تسجيل نشاط في تاريخ مستقبلي" }
   }
@@ -167,7 +168,7 @@ export async function removeServantActivityAction(
     return { ok: false, message: "التاريخ غير صحيح" }
   }
 
-  const cairoToday = cairoDateString(new Date())
+  const cairoToday = cairoDateString(getServerNow())
   if (date !== cairoToday) {
     return { ok: false, message: "يمكن إلغاء تسجيل نشاط اليوم فقط" }
   }
@@ -219,7 +220,7 @@ export async function getServantDayDataAction(servantId?: string): Promise<Serva
   const subjectId = await resolveSubjectServant(admin, actor, servantId)
   if (!subjectId) return { ok: false, message: "غير مصرح" }
 
-  const now = new Date()
+  const now = getServerNow()
   const cairoToday = cairoDateString(now)
   const historySince = cairoDateString(new Date(now.getTime() - SELF_HISTORY_DAYS * 86_400_000))
   const data = await getServantDayData(admin, subjectId, cairoToday, historySince)

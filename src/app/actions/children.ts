@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { ROLES } from "@/lib/roles"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
 import { cairoDateString } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
 import { isUuid } from "@/lib/validation"
 import { validateCommitmentScore } from "@/services/scoring-rules"
 import {
@@ -205,7 +206,7 @@ export async function getChildDayViewAction(
   if (typeof date !== "string" || !isRealDateString(date)) {
     return { ok: false, message: "التاريخ غير صحيح" }
   }
-  const cairoToday = cairoDateString(new Date())
+  const cairoToday = cairoDateString(getServerNow())
   if (date > cairoToday) return { ok: false, message: "لا يمكن عرض تاريخ مستقبلي" }
 
   const admin = createAdminClient()

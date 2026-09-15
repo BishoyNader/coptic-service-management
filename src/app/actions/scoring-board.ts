@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { ROLES } from "@/lib/roles"
 import { isUuid } from "@/lib/validation"
 import { cairoDateString } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
 import {
   getScoringBoardData,
   upsertMemberActivityScore,
@@ -54,7 +55,7 @@ export async function getScoringBoardAction(date: string): Promise<ScoringBoardR
   if (typeof date !== "string" || !isRealDateString(date)) {
     return { ok: false, message: "التاريخ غير صحيح" }
   }
-  const cairoToday = cairoDateString(new Date())
+  const cairoToday = cairoDateString(getServerNow())
   if (date > cairoToday) return { ok: false, message: "لا يمكن عرض تاريخ مستقبلي" }
 
   const board = await getScoringBoardData(createAdminClient(), date)
@@ -87,7 +88,7 @@ export async function saveMemberActivityScoresAction(
   if (!input || !isUuid(input.memberId) || !isRealDateString(input.date)) {
     return { ok: false, saved: 0, failed: 0, message: "بيانات غير صحيحة" }
   }
-  const cairoToday = cairoDateString(new Date())
+  const cairoToday = cairoDateString(getServerNow())
   if (input.date > cairoToday) {
     return { ok: false, saved: 0, failed: 0, message: "لا يمكن تسجيل درجة في تاريخ مستقبلي" }
   }

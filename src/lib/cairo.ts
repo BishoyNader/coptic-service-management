@@ -95,6 +95,37 @@ export function formatCairoDateTime(date: string | Date): string {
   return `${day} — ${formatCairoTime(d)}`
 }
 
+/**
+ * Returns `true` when the Cairo calendar day represented by `date` is Friday
+ * (day-of-week 5). For a `string` input ("YYYY-MM-DD"), the day is derived
+ * from the parsed civil date at UTC noon (same Cairo calendar day). For a
+ * `Date` object, the Intl weekday is resolved in Africa/Cairo.
+ */
+export function isCairoFriday(date: Date | string): boolean {
+  if (typeof date === "string") {
+    const [y, m, d] = date.split("-").map(Number)
+    return new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0)).getUTCDay() === 5
+  }
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: CAIRO_TZ,
+    weekday: "short",
+  }).format(date)
+  return weekday === "Fri"
+}
+
+/**
+ * The most recent Cairo Friday on-or-before `ref`. Attendance only ever
+ * happens on Fridays, so day-desks default to this day instead of the
+ * (possibly non-Friday) civil "today".
+ */
+export function mostRecentCairoFriday(ref: Date = new Date()): Date {
+  const p = cairoParts(ref)
+  const noon = new Date(Date.UTC(p.year, p.month - 1, p.day, 12, 0, 0, 0))
+  const back = (noon.getUTCDay() - 5 + 7) % 7
+  noon.setUTCDate(noon.getUTCDate() - back)
+  return noon
+}
+
 /** ISO instant `days` days before the current moment (UTC). */
 export function daysAgoUtcISO(days: number): string {
   const d = new Date()

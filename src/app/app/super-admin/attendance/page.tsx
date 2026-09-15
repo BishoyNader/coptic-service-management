@@ -6,6 +6,7 @@ import { getProfile } from "@/services/profile-service"
 import { toAttendanceRows } from "@/services/attendance-service"
 import { ROLES } from "@/lib/roles"
 import { cairoDateString, daysAgoUtcISO } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceManagement } from "@/components/app/attendance-management"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
@@ -55,7 +56,7 @@ export default async function SuperAdminAttendancePage() {
         <div>
           <h1 className="font-heading text-xl font-extrabold">سجل الحضور</h1>
           <p className="text-sm text-muted-foreground">
-            متابعة كاملة للحضور — {cairoDateString(new Date())}
+            متابعة كاملة للحضور — {cairoDateString(getServerNow())}
           </p>
         </div>
         <ManualAttendanceDialog people={people} />

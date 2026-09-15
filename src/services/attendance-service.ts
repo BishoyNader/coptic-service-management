@@ -7,7 +7,7 @@ import type {
   UserStatus,
 } from "@/lib/types"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
-import { cairoDateString, cairoLocalToInstant, cairoTimeString } from "@/lib/cairo"
+import { cairoDateString, cairoLocalToInstant, cairoTimeString, isCairoFriday } from "@/lib/cairo"
 import { ROLES } from "@/lib/roles"
 import { logAudit } from "./auth-service"
 import {
@@ -208,6 +208,9 @@ async function executeCheckIn(
   }
 
   const cairoDate = cairoDateString(now)
+  if (!isCairoFriday(cairoDate)) {
+    return { status: "error", message: "الحضور يُسجَّل يوم الجمعة فقط" }
+  }
   const sessionId = await ensureAttendanceSession(admin, type, cairoDate, actorId)
 
   // Duplicate check: an active record already exists for this session.
@@ -499,6 +502,9 @@ export async function correctAttendance(
 
   const originalInstant = new Date(record.attended_at)
   const cairoDate = cairoDateString(originalInstant)
+  if (!isCairoFriday(cairoDate)) {
+    return { ok: false, message: "الحضور يُسجَّل يوم الجمعة فقط" }
+  }
   const newSessionId = await ensureAttendanceSession(admin, newType, cairoDate, actorId)
 
   // No duplicate in the target session for the same person.

@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { formatArabicDate } from "@/lib/dates"
-import { formatCairoTime } from "@/lib/cairo"
+import { formatCairoTime, isCairoFriday, mostRecentCairoFriday } from "@/lib/cairo"
 import { ATTENDANCE_TYPE_LABELS, SCORING_CATEGORY_LABELS } from "@/lib/constants"
 import {
   getChildDayViewAction,
@@ -29,15 +29,6 @@ import {
 } from "@/app/actions/children"
 import type { WeeklyEntryState } from "@/services/scoring-service"
 import type { AttendanceType } from "@/lib/types"
-
-function cairoToday(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Cairo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date())
-}
 
 const COMMITMENT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 const ATTENDANCE_TYPES = Object.keys(ATTENDANCE_TYPE_LABELS) as AttendanceType[]
@@ -60,15 +51,17 @@ export function ServantChildRecords({
   minDate: string
 }) {
   const router = useRouter()
-  const today = cairoToday()
+  const lastFriday = cairoDateString(mostRecentCairoFriday())
 
   const [memberId, setMemberId] = useState<string>(members[0]?.id ?? "")
-  const [date, setDate] = useState(today)
+  const [date, setDate] = useState(lastFriday)
   const [view, setView] = useState<ChildView | null>(null)
   const [loading, setLoading] = useState(false)
   const [busyType, setBusyType] = useState<AttendanceType | null>(null)
   const [busyRemoveId, setBusyRemoveId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const isFriday = isCairoFriday(date)
 
   const [commitment, setCommitment] = useState(0)
   const [serviceCommitment, setServiceCommitment] = useState(0)
