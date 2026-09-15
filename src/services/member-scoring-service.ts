@@ -153,13 +153,13 @@ export async function getScoringBoardData(
 export async function resolveMemberProfile(
   admin: SupabaseAdminClient,
   memberId: string
-): Promise<{ role: AppRole } | null> {
+): Promise<{ role: AppRole; status: string } | null> {
   const { data } = await admin
     .from("profiles")
     .select("role, status")
     .eq("id", memberId)
     .maybeSingle()
-  return data as { role: AppRole } | null
+  return (data as { role: AppRole; status: string } | null) ?? null
 }
 
 export type ActivityScoreResult = { ok: boolean; message: string; points?: number }
@@ -180,13 +180,26 @@ export async function upsertMemberActivityScore(
     return { ok: false, message: "الدرجة غير صحيحة" }
   }
 
+  // Only ACTIVE activities intended for SERVED_MEMBER are gradable on the
+  // board. A SERVANT-role activity (or an inactive one) must be rejected even
+  // when the id is forged — an activity is never bound to a single member.
   const activity = await admin
     .from("activities")
     .select("id, name, min_score, max_score")
     .eq("id", activityId)
     .eq("is_active", true)
+    .eq("for_role", ROLES.SERVED_MEMBER)
     .maybeSingle()
   if (!activity.data) return { ok: false, message: "النشاط غير موجود" }
+
+  // The target must be an EXISTING ACTIVE SERVED_MEMBER. Any other role
+  // (SERVANT / ADMIN / SUPER_ADMIN) or an inactive/archived profile is
+  // rejected up front — this also guards the 0-clear/delete path, which would
+  // otherwise delete a row for whatever id the client sent.
+  const member = await resolveMemberProfile(admin, memberId)
+  if (!member || member.role !== ROLES.SERVED_MEMBER || member.status !== "ACTIVE") {
+    return { ok: false, message: "الشخص غير موجود" }
+  }
 
   const normalized = Math.round(points * 100) / 100
   // A score of 0 = "no award recorded" → remove any existing row.
@@ -212,11 +225,6 @@ export async function upsertMemberActivityScore(
   const min = Number(activity.data.min_score)
   if (normalized < min || normalized > max) {
     return { ok: false, message: `الدرجة يجب أن تكون بين ${min} و ${max}` }
-  }
-
-  const member = await resolveMemberProfile(admin, memberId)
-  if (!member || member.role !== ROLES.SERVED_MEMBER) {
-    return { ok: false, message: "الشخص غير موجود" }
   }
 
   const { data: existing } = await admin

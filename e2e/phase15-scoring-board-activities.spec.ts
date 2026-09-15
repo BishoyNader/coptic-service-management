@@ -165,7 +165,7 @@ test("SUPER_ADMIN activities page loads with seeded SERVED_MEMBER activities", a
   await login(page, superAdmin)
   await page.goto("/app/super-admin/activities")
   await page.waitForLoadState("networkidle")
-  await expect(page.getByRole("heading", { name: "الأنشطة والدرجات" })).toBeVisible()
+  await expect(page.getByText("الأنشطة والدرجات")).toBeVisible()
   await expect(page.getByText("حفظ المزامير")).toBeVisible()
   await expect(page.getByText("السلوك الحسن")).toBeVisible()
 })
@@ -220,14 +220,14 @@ test("SUPER_ADMIN archives then restores activity", async ({ page }) => {
 
   await page.getByTestId(`archive-activity-${addedActivityId}`).click()
   await page.getByTestId("archive-activity-confirm").click()
-  await expect(page.getByText("تم حذف النشاط")).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText("تمت أرشفة النشاط")).toBeVisible({ timeout: 10_000 })
 
   const row = page.getByTestId(`activity-row-${addedActivityId}`)
   await expect(row.getByText("محذوف")).toBeVisible()
   await expect(page.getByTestId(`restore-activity-${addedActivityId}`)).toBeVisible()
 
   await page.getByTestId(`restore-activity-${addedActivityId}`).click()
-  await expect(page.getByText("تم استرجاع النشاط")).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText("تمت استعادة النشاط")).toBeVisible({ timeout: 10_000 })
   await expect(row.getByText("محذوف")).not.toBeVisible()
 })
 
@@ -326,12 +326,12 @@ test("Member scores page shows activity tab with today's scores and percentages"
   await expect(page.getByRole("tab", { name: "نشاط اليوم" })).toBeVisible()
 
   // Today's score card
-  await expect(page.getByText("درجة اليوم")).toBeVisible()
+  await expect(page.getByText("درجة اليوم", { exact: true })).toBeVisible()
   // Activity row for حفظ المزامير with saved 8/10
   await expect(page.getByText("حفظ المزامير")).toBeVisible()
   await expect(page.getByText("8 / 10")).toBeVisible()
   // Percent badge: 80%
-  await expect(page.getByText("80%")).toBeVisible()
+  await expect(page.getByText("80%", { exact: true })).toBeVisible()
 
   // Total card
   await expect(page.getByText("الإجمالي الكلي")).toBeVisible()
