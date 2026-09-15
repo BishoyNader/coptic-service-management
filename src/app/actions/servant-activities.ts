@@ -6,6 +6,7 @@ import { ROLES } from "@/lib/roles"
 import { logAudit } from "@/services/auth-service"
 import { cairoDateString } from "@/lib/cairo"
 import { isUuid } from "@/lib/validation"
+import { getServantDayData, type ServantDayData } from "@/services/servant-day-service"
 
 export type ServantActivityResult = {
   ok: boolean
@@ -23,7 +24,8 @@ function isRealDateString(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
 }
 
-async function requireServant(): Promise<{ actorId: string } | null> {
+/** Servant and super-admin (acting on a servant's behalf) may use this desk. */
+async function requireServantActor(): Promise<{ actorId: string; role: string } | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -36,20 +38,51 @@ async function requireServant(): Promise<{ actorId: string } | null> {
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || profile.role !== ROLES.SERVANT) return null
-  return { actorId: user.id }
+  if (
+    !profile ||
+    (profile.role !== ROLES.SERVANT && profile.role !== ROLES.SUPER_ADMIN)
+  ) {
+    return null
+  }
+  return { actorId: user.id, role: profile.role }
 }
 
 /**
- * Servant records their own participation in an active SERVANT activity.
- * The date is the Cairo calendar date of the activity (today by default),
- * never a future date. Duplicate submissions are idempotent.
+ * Resolves whom the record is being written for. A servant can only ever act
+ * on themselves; a super admin may pass any active servant's id.
+ */
+async function resolveSubjectServant(
+  admin: ReturnType<typeof createAdminClient>,
+  actor: { actorId: string; role: string },
+  servantId: string | undefined
+): Promise<string | null> {
+  if (actor.role === ROLES.SERVANT) {
+    return servantId && servantId !== actor.actorId ? null : actor.actorId
+  }
+
+  const target = servantId ?? actor.actorId
+  if (!isUuid(target)) return null
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, role, status")
+    .eq("id", target)
+    .maybeSingle()
+  if (!profile || profile.role !== ROLES.SERVANT || profile.status !== "ACTIVE") return null
+  return target
+}
+
+/**
+ * Servant records their own participation in an active SERVANT activity — or,
+ * for a super admin, the participation of any active servant. The date is the
+ * Cairo calendar date of the activity (today by default), never a future date.
+ * Duplicate submissions are idempotent.
  */
 export async function recordServantActivityAction(
   activityId: string,
-  date: string
+  date: string,
+  servantId?: string
 ): Promise<ServantActivityResult> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (!isUuid(activityId)) {
     return { ok: false, message: "نشاط غير صحيح" }
@@ -65,6 +98,9 @@ export async function recordServantActivityAction(
 
   const admin = createAdminClient()
 
+  const subjectId = await resolveSubjectServant(admin, actor, servantId)
+  if (!subjectId) return { ok: false, message: "غير مصرح" }
+
   const { data: activity } = await admin
     .from("activities")
     .select("id, is_active, for_role")
@@ -77,7 +113,7 @@ export async function recordServantActivityAction(
   const { data: existing } = await admin
     .from("servant_activity_records")
     .select("id")
-    .eq("servant_id", actor.actorId)
+    .eq("servant_id", subjectId)
     .eq("activity_id", activityId)
     .eq("recorded_on", date)
     .maybeSingle()
@@ -86,7 +122,7 @@ export async function recordServantActivityAction(
   const { data: inserted, error } = await admin
     .from("servant_activity_records")
     .insert({
-      servant_id: actor.actorId,
+      servant_id: subjectId,
       activity_id: activityId,
       recorded_on: date,
       recorded_by: actor.actorId,
@@ -112,15 +148,17 @@ export async function recordServantActivityAction(
 }
 
 /**
- * Servant removes their OWN record — only for TODAY. Past recordings are
- * immutable: the same rule is enforced by the RLS delete policy, and this
- * server action re-enforces it for the admin-client path.
+ * Servant removes their own (today-only) activity record — a super admin may
+ * remove the equivalent record on behalf of any active servant. Past
+ * recordings are immutable: the same rule is enforced by the RLS delete
+ * policy, and this server action re-enforces it for the admin-client path.
  */
 export async function removeServantActivityAction(
   activityId: string,
-  date: string
+  date: string,
+  servantId?: string
 ): Promise<ServantActivityResult> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (!isUuid(activityId)) {
     return { ok: false, message: "نشاط غير صحيح" }
@@ -136,10 +174,13 @@ export async function removeServantActivityAction(
 
   const admin = createAdminClient()
 
+  const subjectId = await resolveSubjectServant(admin, actor, servantId)
+  if (!subjectId) return { ok: false, message: "غير مصرح" }
+
   const { data: existing } = await admin
     .from("servant_activity_records")
     .select("id")
-    .eq("servant_id", actor.actorId)
+    .eq("servant_id", subjectId)
     .eq("activity_id", activityId)
     .eq("recorded_on", date)
     .maybeSingle()
@@ -153,8 +194,34 @@ export async function removeServantActivityAction(
     action: "SERVANT_ACTIVITY_REMOVED",
     entity: "SERVANT_ACTIVITY",
     entityId: existing.id,
-    metadata: { activity_id: activityId, recorded_on: date },
+    metadata: { activity_id: activityId, recorded_on: date, servant_id: subjectId },
   })
 
   return { ok: true, message: "تم إلغاء التسجيل" }
+}
+
+const SELF_HISTORY_DAYS = 14
+
+export type ServantDayActionResult =
+  | { ok: true; data: ServantDayData }
+  | { ok: false; message: string }
+
+/**
+ * One servant's "day desk" (today's attendance + recent attendance + active
+ * SERVANT activities + participation history). A servant may load only their
+ * own desk; a super admin may load any active servant's desk on their behalf.
+ */
+export async function getServantDayDataAction(servantId?: string): Promise<ServantDayActionResult> {
+  const actor = await requireServantActor()
+  if (!actor) return { ok: false, message: "غير مصرح" }
+
+  const admin = createAdminClient()
+  const subjectId = await resolveSubjectServant(admin, actor, servantId)
+  if (!subjectId) return { ok: false, message: "غير مصرح" }
+
+  const now = new Date()
+  const cairoToday = cairoDateString(now)
+  const historySince = cairoDateString(new Date(now.getTime() - SELF_HISTORY_DAYS * 86_400_000))
+  const data = await getServantDayData(admin, subjectId, cairoToday, historySince)
+  return { ok: true, data }
 }

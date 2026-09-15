@@ -4,15 +4,16 @@ import { config as loadEnv } from "dotenv"
 import { createClient } from "@supabase/supabase-js"
 
 /**
- * PHASE 14 — SERVANT children records board + own day tab.
+ * PHASE 14 — SERVANT children records board + own day hub.
  *
- * The two new servant tabs:
+ * The servant desk is now a 2-tab hub:
  *  - /app/servant/children "سجلات الأولاد": per-child, per-date attendance
  *    entry (record / remove own) plus the weekly grades card and a recent
  *    history of attendance + scored categories.
- *  - /app/servant/my-day "حضوري وأنشطتي": own attendance for today (one-tap
- *    self check-in) + a two-week summary of own attendance above the reused
- *    servant activity panel.
+ *  - /app/servant/activities "الأنشطة": tab "نشاطي" is the servant's own
+ *    attendance for today (one-tap self check-in) + a two-week summary of own
+ *    attendance above the reused servant activity panel; tab "المخدومين" is
+ *    the embedded unified scoring board (see phase 15).
  * Writes go through servant-gated server actions -> service-role RPCs; a
  * client can never forge attended_at/points or write rows directly.
  */
@@ -163,9 +164,8 @@ const twoDaysAgo = new Intl.DateTimeFormat("en-CA", {
 // ─── Nav ────────────────────────────────────────────────────────────────────
 test("SERVANT nav shows new tabs", async ({ page }) => {
   await login(page, servant)
-  await expect(page.getByRole("link", { name: "سجلات الأولاد" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "حضوري وأنشطتي" })).toBeVisible()
   await expect(page.getByRole("link", { name: "الأنشطة" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "حضوري وأنشطتي" })).not.toBeVisible()
 })
 
 // ─── Children page ──────────────────────────────────────────────────────────
@@ -245,14 +245,15 @@ test("Servant records SERVICE attendance for a past date", async ({ page }) => {
   await expect(card.getByText("تم تسجيله")).toBeVisible({ timeout: 10_000 })
 })
 
-// ─── My-day page ─────────────────────────────────────────────────────────────
-test("My-day page shows own attendance + records CHURCH + activities", async ({
+// ─── My-day hub ─────────────────────────────────────────────────────────────
+test("Hub own tab shows own attendance + records CHURCH + activities", async ({
   page,
 }) => {
   await login(page, servant)
-  await page.goto("/app/servant/my-day")
+  await page.goto("/app/servant/activities")
   await page.waitForLoadState("networkidle")
-  await expect(page.getByRole("heading", { name: "حضوري وأنشطتي" })).toBeVisible()
+  await expect(page.getByTestId("hub-tab-own")).toBeVisible()
+  await expect(page.getByTestId("hub-tab-members")).toBeVisible()
   await expect(page.getByTestId("my-day-attendance-card")).toHaveCount(2)
 
   const churchCard = page
@@ -265,12 +266,11 @@ test("My-day page shows own attendance + records CHURCH + activities", async ({
   }
   await expect(churchCard.getByText("تم تسجيله")).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText("حضور آخر أسبوعين")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "الأنشطة" })).toBeVisible()
 })
 
-test("Recent attendance section renders attendance items", async ({ page }) => {
+test("Hub own tab recent attendance section renders attendance items", async ({ page }) => {
   await login(page, servant)
-  await page.goto("/app/servant/my-day")
+  await page.goto("/app/servant/activities")
   await page.waitForLoadState("networkidle")
   // The previous tests recorded attendance/scores for the servant-scoped user
   await expect(page.getByText("حضور آخر أسبوعين")).toBeVisible()

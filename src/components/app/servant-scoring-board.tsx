@@ -81,10 +81,16 @@ export function ServantScoringBoard({
   currentUserId,
   cairoToday,
   initialBoard,
+  embedded = false,
+  allowRemoveAny = false,
 }: {
   currentUserId: string
   cairoToday: string
   initialBoard: Board
+  /** Render inside another page (hide the page heading). */
+  embedded?: boolean
+  /** Allow tapping an attendance chip to remove it even when someone else recorded it. */
+  allowRemoveAny?: boolean
 }) {
   const [tab, setTab] = useState<"today" | "history">("today")
 
@@ -152,7 +158,11 @@ export function ServantScoringBoard({
     if (tab !== "today") return
     const record = member.attendance.find((a) => a.type === type)
     if (record) {
-      if (record.recordedBy !== null && record.recordedBy !== currentUserId) {
+      if (
+        record.recordedBy !== null &&
+        record.recordedBy !== currentUserId &&
+        !allowRemoveAny
+      ) {
         toast.info("سُجل بواسطة خادم آخر")
         return
       }
@@ -196,12 +206,14 @@ export function ServantScoringBoard({
 
   return (
     <div className="space-y-5">
-      <div className="space-y-1">
-        <h1 className="font-heading text-2xl font-extrabold">التقييم</h1>
-        <p className="text-sm text-muted-foreground">
-          سجّل حضور ودرجات كل المخدومين من شاشة واحدة
-        </p>
-      </div>
+      {!embedded && (
+        <div className="space-y-1">
+          <h1 className="font-heading text-2xl font-extrabold">التقييم</h1>
+          <p className="text-sm text-muted-foreground">
+            سجّل حضور ودرجات كل المخدومين من شاشة واحدة
+          </p>
+        </div>
+      )}
 
       <Tabs
         value={tab}
@@ -225,6 +237,7 @@ export function ServantScoringBoard({
             board={board}
             editable
             currentUserId={currentUserId}
+            allowRemoveAny={allowRemoveAny}
             draftValue={draftValue}
             setDraft={setDraft}
             scoreFor={scoreFor}
@@ -268,6 +281,7 @@ export function ServantScoringBoard({
                 board={historyBoard}
                 editable={false}
                 currentUserId={currentUserId}
+                allowRemoveAny={allowRemoveAny}
                 draftValue={draftValue}
                 setDraft={setDraft}
                 scoreFor={scoreFor}
@@ -290,6 +304,7 @@ function MemberList({
   board,
   editable,
   currentUserId,
+  allowRemoveAny,
   draftValue,
   setDraft,
   scoreFor,
@@ -303,6 +318,7 @@ function MemberList({
   board: Board
   editable: boolean
   currentUserId: string
+  allowRemoveAny: boolean
   draftValue: (memberId: string, activityId: string, existing: number) => string
   setDraft: (memberId: string, activityId: string, value: string) => void
   scoreFor: (member: ScoringBoardMember, activityId: string) => number
@@ -342,6 +358,7 @@ function MemberList({
           activities={board.activities}
           editable={editable}
           currentUserId={currentUserId}
+          allowRemoveAny={allowRemoveAny}
           draftValue={draftValue}
           setDraft={setDraft}
           scoreFor={scoreFor}
@@ -361,6 +378,7 @@ function MemberCard({
   activities,
   editable,
   currentUserId,
+  allowRemoveAny,
   draftValue,
   setDraft,
   scoreFor,
@@ -374,6 +392,7 @@ function MemberCard({
   activities: Board["activities"]
   editable: boolean
   currentUserId: string
+  allowRemoveAny: boolean
   draftValue: (memberId: string, activityId: string, existing: number) => string
   setDraft: (memberId: string, activityId: string, value: string) => void
   scoreFor: (member: ScoringBoardMember, activityId: string) => number
@@ -413,7 +432,8 @@ function MemberCard({
       <div className="grid grid-cols-2 gap-2">
         {ATTENDANCE_TYPES.map((type) => {
           const record = member.attendance.find((a) => a.type === type) ?? null
-          const removable = record !== null && record.recordedBy === currentUserId
+          const removable =
+            record !== null && (record.recordedBy === currentUserId || allowRemoveAny)
           const chipBusy = busy && busyAttendance!.type === type
           const removeBusy = busyRemoveId === record?.id
           return (

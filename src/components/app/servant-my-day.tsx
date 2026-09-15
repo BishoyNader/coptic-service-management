@@ -36,6 +36,9 @@ export function ServantMyDay({
   recentAttendance,
   activities,
   history,
+  embedded = false,
+  servantId,
+  onChanged,
 }: {
   profileId: string
   cairoToday: string
@@ -44,6 +47,12 @@ export function ServantMyDay({
   recentAttendance: MyDayAttendance[]
   activities: { id: string; name: string; icon: string | null }[]
   history: { activityId: string; recordedOn: string }[]
+  /** Render inside another page (hide the page heading). */
+  embedded?: boolean
+  /** Subject servant when recording on behalf of another servant (super admin). */
+  servantId?: string
+  /** Called after any successful write so the parent can refresh its data. */
+  onChanged?: () => void
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState<AttendanceType | null>(null)
@@ -57,23 +66,29 @@ export function ServantMyDay({
     setBusy(null)
     if (res.status === "success") {
       toast.success(`تم تسجيل الحضور (${res.points} نقطة)`)
-      router.refresh()
+      if (!embedded) router.refresh()
+      onChanged?.()
     } else if (res.status === "duplicate") {
       toast.info(res.message)
-      router.refresh()
+      if (!embedded) router.refresh()
+      onChanged?.()
     } else {
       toast.error(res.message)
     }
   }
 
+  const showHeading = !embedded
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="font-heading text-xl font-extrabold">حضوري وأنشطتي</h1>
-        <p className="text-sm text-muted-foreground">
-          سجّل حضورك اليوم وتابع مشاركاتك في أنشطة الخدمة — كل حاجة في مكان واحد
-        </p>
-      </div>
+      {showHeading && (
+        <div className="space-y-1">
+          <h1 className="font-heading text-xl font-extrabold">حضوري وأنشطتي</h1>
+          <p className="text-sm text-muted-foreground">
+            سجّل حضورك اليوم وتابع مشاركاتك في أنشطة الخدمة — كل حاجة في مكان واحد
+          </p>
+        </div>
+      )}
 
       {/* Own attendance — today */}
       <section aria-label="حضور اليوم" className="space-y-2">
@@ -181,6 +196,8 @@ export function ServantMyDay({
             history={history}
             cairoToday={cairoToday}
             minDate={minDate}
+            servantId={servantId}
+            onChanged={onChanged}
           />
         )}
       </section>

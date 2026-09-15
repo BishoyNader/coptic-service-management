@@ -155,7 +155,8 @@ async function login(page: Page, seed: Seed) {
 
 test("SUPER_ADMIN nav shows الأنشطة link", async ({ page }) => {
   await login(page, superAdmin)
-  await expect(page.getByRole("link", { name: "الأنشطة" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "الأنشطة", exact: true })).toBeVisible()
+  await expect(page.getByRole("link", { name: "تسجيل الأنشطة" })).toBeVisible()
 })
 
 test("SUPER_ADMIN activities page loads with seeded SERVED_MEMBER activities", async ({
@@ -232,19 +233,20 @@ test("SUPER_ADMIN archives then restores activity", async ({ page }) => {
 
 // ─── SERVANT — Unified scoring board ─────────────────────────────────────────
 
-test("SERVANT nav shows التقييم link", async ({ page }) => {
+test("SERVANT nav shows الأنشطة link", async ({ page }) => {
   await login(page, servant)
-  await expect(page.getByRole("link", { name: "التقييم" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "الأنشطة" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "التقييم" })).not.toBeVisible()
 })
 
 test("Servant scoring board shows today tab with all members and activity inputs", async ({
   page,
 }) => {
   await login(page, servant)
-  await page.goto("/app/servant/scoring")
+  await page.goto("/app/servant/activities")
   await page.waitForLoadState("networkidle")
 
-  await expect(page.getByRole("heading", { name: "التقييم" })).toBeVisible()
+  await page.getByTestId("hub-tab-members").click()
   await expect(page.getByTestId("board-tab-today")).toBeVisible()
   await expect(page.getByTestId("board-tab-history")).toBeVisible()
 
@@ -268,10 +270,10 @@ test("Servant scoring board shows today tab with all members and activity inputs
 
 test("Servant records attendance and saves scores for member", async ({ page }) => {
   await login(page, servant)
-  await page.goto("/app/servant/scoring")
+  await page.goto("/app/servant/activities")
   await page.waitForLoadState("networkidle")
 
-  const memberCard = page.getByTestId(`board-member-${member.userId}`)
+  await page.getByTestId("hub-tab-members").click()
 
   // Record CHURCH attendance for the member
   const churchChip = page.getByTestId(`attendance-chip-CHURCH-${member.userId}`)
@@ -292,9 +294,10 @@ test("Servant records attendance and saves scores for member", async ({ page }) 
 
 test("Servant history tab shows past dates read-only", async ({ page }) => {
   await login(page, servant)
-  await page.goto("/app/servant/scoring")
+  await page.goto("/app/servant/activities")
   await page.waitForLoadState("networkidle")
 
+  await page.getByTestId("hub-tab-members").click()
   await page.getByTestId("board-tab-history").click()
 
   const dateInput = page.getByTestId("board-history-date")
@@ -302,7 +305,6 @@ test("Servant history tab shows past dates read-only", async ({ page }) => {
   await expect(dateInput).toHaveValue(yesterday)
 
   // No save buttons (read-only) in history tab
-  const memberCard = page.getByTestId(`board-member-${member.userId}`)
   // activity inputs should NOT exist (history renders span, not input)
   await expect(
     page.getByTestId(`activity-input-${memorizationActivityId}-${member.userId}`),
@@ -337,8 +339,8 @@ test("Member scores page shows activity tab with today's scores and percentages"
 
 // ─── Access control ───────────────────────────────────────────────────────────
 
-test("Unauthenticated user redirected from servant scoring page", async ({ page }) => {
-  await page.goto("/app/servant/scoring")
+test("Unauthenticated user redirected from servant activities hub", async ({ page }) => {
+  await page.goto("/app/servant/activities")
   await page.waitForURL(/\/login/, { timeout: 10_000 })
   expect(page.url()).toContain("/login")
 })

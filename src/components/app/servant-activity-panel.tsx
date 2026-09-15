@@ -31,6 +31,10 @@ type ServantActivityPanelProps = {
   history: HistoryEntry[]
   cairoToday: string
   minDate: string
+  /** Subject servant id when recording on behalf of another servant (super admin). */
+  servantId?: string
+  /** Called after a successful record/undo so the parent can refresh the history. */
+  onChanged?: () => void
 }
 
 const ICONS: Record<string, LucideIcon> = {
@@ -57,6 +61,8 @@ export function ServantActivityPanel({
   history,
   cairoToday,
   minDate,
+  servantId,
+  onChanged,
 }: ServantActivityPanelProps) {
   const [date, setDate] = useState(cairoToday)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -75,11 +81,12 @@ export function ServantActivityPanel({
     setBusyId(activityId)
     startTransition(async () => {
       const result = recorded
-        ? await removeServantActivityAction(activityId, date)
-        : await recordServantActivityAction(activityId, date)
+        ? await removeServantActivityAction(activityId, date, servantId)
+        : await recordServantActivityAction(activityId, date, servantId)
       setBusyId(null)
       if (result.ok && !result.already) {
         toast.success(result.message)
+        onChanged?.()
       } else if (result.ok) {
         toast.info(result.message)
       } else {

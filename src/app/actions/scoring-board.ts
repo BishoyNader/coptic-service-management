@@ -21,7 +21,7 @@ function isRealDateString(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
 }
 
-async function requireServant(): Promise<{ actorId: string } | null> {
+async function requireServantActor(): Promise<{ actorId: string; role: string } | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -34,17 +34,22 @@ async function requireServant(): Promise<{ actorId: string } | null> {
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || profile.role !== ROLES.SERVANT) return null
-  return { actorId: user.id }
+  if (
+    !profile ||
+    (profile.role !== ROLES.SERVANT && profile.role !== ROLES.SUPER_ADMIN)
+  ) {
+    return null
+  }
+  return { actorId: user.id, role: profile.role }
 }
 
 export type ScoringBoardResult =
   | { ok: true; board: ScoringBoardData }
   | { ok: false; message: string }
 
-/** Servant-scoped unified board: all active members + their day's data. */
+/** Servant/super-admin unified board: all active members + their day's data. */
 export async function getScoringBoardAction(date: string): Promise<ScoringBoardResult> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (typeof date !== "string" || !isRealDateString(date)) {
     return { ok: false, message: "التاريخ غير صحيح" }
@@ -77,7 +82,7 @@ export type SaveBoardScoresResult = {
 export async function saveMemberActivityScoresAction(
   input: SaveBoardScoresInput
 ): Promise<SaveBoardScoresResult> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, saved: 0, failed: 0, message: "غير مصرح" }
   if (!input || !isUuid(input.memberId) || !isRealDateString(input.date)) {
     return { ok: false, saved: 0, failed: 0, message: "بيانات غير صحيحة" }

@@ -20,8 +20,6 @@ export const MEMBER_NAV: NavItem[] = [
 
 export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant", label: "الرئيسية", icon: "home" },
-  { href: "/app/servant/scoring", label: "التقييم", icon: "star" },
-  { href: "/app/servant/my-day", label: "حضوري وأنشطتي", icon: "activity" },
   { href: "/app/servant/attendance", label: "الحضور", icon: "scan" },
   { href: "/app/servant/qr", label: "QR", icon: "qr" },
   { href: "/app/servant/activities", label: "الأنشطة", icon: "clipboard" },
@@ -51,6 +49,7 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/super-admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/super-admin/activities", label: "الأنشطة", icon: "clipboard" },
+  { href: "/app/servant/activities", label: "تسجيل الأنشطة", icon: "activity" },
   { href: "/app/super-admin/reports", label: "التقارير", icon: "chart" },
   { href: "/app/super-admin/users", label: "المستخدمين", icon: "shield" },
   { href: "/app/super-admin/audit-log", label: "سجل العمليات", icon: "history" },

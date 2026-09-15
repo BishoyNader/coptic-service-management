@@ -618,15 +618,16 @@ export async function recordChildAttendance(
 }
 
 /**
- * A servant may undo an attendance record THEY created for a child. The
- * linked auto-derived score row is removed by cascade, so weekly/monthly
- * totals recompute from the remaining attendance-engine rows.
+ * A servant may undo an attendance record THEY created for a child. A super
+ * admin may undo any record (full access). The linked auto-derived score row
+ * is removed by cascade, so weekly/monthly totals recompute from the
+ * remaining attendance-engine rows.
  */
 export async function removeServantChildAttendance(
   admin: SupabaseAdminClient,
-  params: { actorId: string; recordId: string }
+  params: { actorId: string; actorRole?: string; recordId: string }
 ): Promise<{ ok: boolean; message: string }> {
-  const { actorId, recordId } = params
+  const { actorId, actorRole, recordId } = params
 
   const { data: row } = await admin
     .from("attendance_records")
@@ -635,7 +636,7 @@ export async function removeServantChildAttendance(
     .maybeSingle()
 
   if (!row) return { ok: false, message: "سجل الحضور غير موجود" }
-  if (row.recorded_by !== actorId) {
+  if (row.recorded_by !== actorId && actorRole !== ROLES.SUPER_ADMIN) {
     return { ok: false, message: "لا يمكن حذف تسجيلة سجلها شخص آخر" }
   }
 

@@ -34,7 +34,7 @@ function isRealDateString(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
 }
 
-async function requireServant(): Promise<{ actorId: string } | null> {
+async function requireServantActor(): Promise<{ actorId: string; role: string } | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -47,8 +47,13 @@ async function requireServant(): Promise<{ actorId: string } | null> {
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || profile.role !== ROLES.SERVANT) return null
-  return { actorId: user.id }
+  if (
+    !profile ||
+    (profile.role !== ROLES.SERVANT && profile.role !== ROLES.SUPER_ADMIN)
+  ) {
+    return null
+  }
+  return { actorId: user.id, role: profile.role }
 }
 
 export type ChildAttendanceActionResult = {
@@ -66,7 +71,7 @@ export async function recordChildAttendanceAction(
   type: string,
   date: string
 ): Promise<ChildAttendanceActionResult> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (!isUuid(memberId)) return { ok: false, message: "مخدوم غير صحيح" }
   if (typeof type !== "string" || !isAttendanceType(type)) {
@@ -93,17 +98,18 @@ export async function recordChildAttendanceAction(
   return { ok: false, message: res.message }
 }
 
-/** A servant may undo their own attendance entry for a child. */
+/** A servant may undo their own attendance entry for a child; super admins may undo any. */
 export async function removeChildAttendanceAction(
   recordId: string
 ): Promise<{ ok: boolean; message: string }> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (!isUuid(recordId)) return { ok: false, message: "سجل غير صحيح" }
 
   const admin = createAdminClient()
   const result = await removeServantChildAttendance(admin, {
     actorId: actor.actorId,
+    actorRole: actor.role,
     recordId,
   })
   console.log("[children.removeChildAttendanceAction]", { recordId, result })
@@ -124,7 +130,7 @@ export async function saveChildScoresAction(input: {
   communion: boolean
   bonus: boolean
 }): Promise<{ ok: boolean; changed?: boolean; message?: string }> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (!isUuid(input.profileId)) return { ok: false, message: "مخدوم غير صحيح" }
   if (typeof input.date !== "string" || !isRealDateString(input.date)) {
@@ -193,7 +199,7 @@ export async function getChildDayViewAction(
   memberId: string,
   date: string
 ): Promise<ChildDayView> {
-  const actor = await requireServant()
+  const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (!isUuid(memberId)) return { ok: false, message: "مخدوم غير صحيح" }
   if (typeof date !== "string" || !isRealDateString(date)) {
