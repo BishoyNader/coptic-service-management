@@ -13,7 +13,8 @@ export default async function AdminBirthdaysPage() {
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.ADMIN) redirect("/")
 
-  const rows = await getUpcomingBirthdays(supabase)
+  // Admin sees served members and servants (not admins/super-admins)
+  const rows = await getUpcomingBirthdays(supabase, [ROLES.SERVED_MEMBER, ROLES.SERVANT])
 
   return (
     <div className="space-y-4">

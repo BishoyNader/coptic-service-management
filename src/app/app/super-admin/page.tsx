@@ -51,7 +51,7 @@ export default async function SuperAdminHomePage() {
       .from("score_records")
       .select("id", { count: "exact", head: true })
       .eq("session_date", today),
-    getUpcomingBirthdays(supabase),
+    getUpcomingBirthdays(supabase, [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SERVED_MEMBER]),
   ])
 
   const todayRecords = ((todayAttendance.data ?? []) as never[]) as {

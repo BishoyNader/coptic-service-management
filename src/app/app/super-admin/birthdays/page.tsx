@@ -13,7 +13,13 @@ export default async function SuperAdminBirthdaysPage() {
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SUPER_ADMIN) redirect("/")
 
-  const rows = await getUpcomingBirthdays(supabase)
+  // Super Admin sees all roles: served members, servants, admins, and super admins
+  const rows = await getUpcomingBirthdays(supabase, [
+    ROLES.SERVED_MEMBER,
+    ROLES.SERVANT,
+    ROLES.ADMIN,
+    ROLES.SUPER_ADMIN,
+  ])
 
   return (
     <div className="space-y-4">

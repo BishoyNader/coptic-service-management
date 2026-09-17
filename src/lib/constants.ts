@@ -56,6 +56,11 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
     label: "أعوام الخدمة",
     icon: "calendar",
   },
+  {
+    href: "/app/super-admin/coptic-calendar",
+    label: "التقويم القبطي",
+    icon: "calendar",
+  },
   { href: "/app/super-admin/users", label: "المستخدمين", icon: "shield" },
   {
     href: "/app/super-admin/audit-log",

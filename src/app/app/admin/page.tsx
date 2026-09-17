@@ -37,7 +37,7 @@ export default async function AdminHomePage() {
       .neq("status", "ARCHIVED")
       .order("attended_at", { ascending: false })
       .limit(8),
-    getUpcomingBirthdays(supabase),
+    getUpcomingBirthdays(supabase, [ROLES.ADMIN, ROLES.SERVED_MEMBER, ROLES.SUPER_ADMIN]),
   ])
 
   const activeMembers = membersResult.count ?? 0
