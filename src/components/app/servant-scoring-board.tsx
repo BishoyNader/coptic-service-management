@@ -22,6 +22,7 @@ import { cn } from "cn"
 import { toast } from "sonner"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
 import { formatArabicDate } from "@/lib/dates"
+import { lastFridayOnOrBefore } from "@/lib/friday"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
@@ -134,7 +135,11 @@ export function ServantScoringBoard({
   }
 
   const handleHistoryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const next = e.target.value || cairoDaysAgo(1)
+    const raw = e.target.value || cairoDaysAgo(1)
+    // Snap to the trailing Friday so weekly records are always accessed via
+    // their anchor Friday — the ministry week starts on Sunday and ends on
+    // Friday; all scoring and attendance sits on the Friday.
+    const next = lastFridayOnOrBefore(raw)
     setHistoryDate(next)
     if (tab === "history") {
       void loadHistory(next)

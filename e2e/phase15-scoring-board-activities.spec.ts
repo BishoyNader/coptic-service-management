@@ -31,6 +31,35 @@ const yesterday = new Intl.DateTimeFormat("en-CA", {
   .format(new Date(Date.now() - 86_400_000))
   .slice(0, 10)
 
+// Deterministic fixture dates — never a function of the civil weekday the
+// suite happens to run on: `deterministicFriday` is the most recent Cairo
+// Friday on-or-before run time (attendance is Friday-only), and the day
+// before it is a guaranteed non-Friday for the rejection case.
+function addDaysDate(date: string, n: number): string {
+  const [y, m, d] = date.split("-").map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n, 12, 0, 0, 0)).toISOString().slice(0, 10)
+}
+
+function isCairoFriday(date: string): boolean {
+  return new Date(`${date}T12:00:00Z`).getUTCDay() === 5
+}
+
+function lastFridayOnOrBefore(date: string): string {
+  let cursor = date
+  while (!isCairoFriday(cursor)) cursor = addDaysDate(cursor, -1)
+  return cursor
+}
+
+const deterministicFriday = lastFridayOnOrBefore(today)
+const deterministicNonFriday = addDaysDate(deterministicFriday, -1)
+
+// Tests in this file build on shared seeded state (activity created by the
+// add test is edited/archived by later tests, and today's saved member score
+// is asserted by the member test). Serial mode guarantees a single `beforeAll`
+// seed and prevents a mid-file failure from re-loading the file and re-seeding
+// different users/activities mid-run.
+test.describe.configure({ mode: "serial" })
+
 let superAdmin: Seed
 let servant: Seed
 let member: Seed
@@ -96,6 +125,7 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
+  if (process.env.KEEP === "1") return
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -133,7 +163,7 @@ test.afterAll(async () => {
     await admin
       .from("attendance_sessions")
       .delete()
-      .eq("session_date", today)
+      .in("session_date", [deterministicFriday, today])
       .in("created_by", [servant.userId])
   }
 
@@ -209,8 +239,8 @@ test("SUPER_ADMIN edits activity name and range", async ({ page }) => {
   await page.getByTestId("activity-form-submit").click()
 
   await expect(page.getByText("تم تحديث النشاط")).toBeVisible({ timeout: 10_000 })
-  await expect(page.getByText("نشاط اختبار معدل")).toBeVisible()
-  await expect(page.getByText("0–8")).toBeVisible()
+  await expect(page.getByTestId(`activity-row-${addedActivityId}`).getByText("نشاط اختبار معدل")).toBeVisible()
+  await expect(page.getByTestId(`activity-row-${addedActivityId}`).getByText("0–8")).toBeVisible()
 })
 
 test("SUPER_ADMIN archives then restores activity", async ({ page }) => {
@@ -268,19 +298,26 @@ test("Servant scoring board shows today tab with all members and activity inputs
   ).toBeVisible()
 })
 
-test("Servant records attendance and saves scores for member", async ({ page }) => {
+test("Servant records attendance on a deterministic Friday and saves scores for member", async ({
+  page,
+}) => {
   await login(page, servant)
-  await page.goto("/app/servant/activities")
+  await page.goto("/app/servant/children")
   await page.waitForLoadState("networkidle")
 
+  // Record CHURCH attendance for the member on a deterministic Friday.
+  await page.locator("#child-records-member").selectOption(member.userId)
+  await page.locator("#child-records-date").fill(deterministicFriday)
+  const churchCard = page.getByTestId("attendance-card-CHURCH")
+  await churchCard.getByRole("button", { name: "سجّل" }).click()
+  await expect(page.getByText(/تم تسجيل الحضور/)).toBeVisible({ timeout: 10_000 })
+  await expect(churchCard.getByText(/تم تسجيله/)).toBeVisible()
+  await expect(churchCard.getByText("لم يُسجَّل بعد")).not.toBeVisible()
+
+  // Score the memorization activity with 8 points on the board (today).
+  await page.goto("/app/servant/activities")
+  await page.waitForLoadState("networkidle")
   await page.getByTestId("hub-tab-members").click()
-
-  // Record CHURCH attendance for the member
-  const churchChip = page.getByTestId(`attendance-chip-CHURCH-${member.userId}`)
-  await churchChip.click()
-  await expect(churchChip.getByText("اضغط للإلغاء")).toBeVisible({ timeout: 10_000 })
-
-  // Score the memorization activity with 8 points
   const input = page.getByTestId(`activity-input-${memorizationActivityId}-${member.userId}`)
   await input.fill("8")
 
@@ -290,6 +327,25 @@ test("Servant records attendance and saves scores for member", async ({ page }) 
 
   // Input value should persist
   await expect(input).toHaveValue("8")
+})
+
+test("Non-Friday attendance is rejected by the Friday-only rule", async ({ page }) => {
+  await login(page, servant)
+  await page.goto("/app/servant/children")
+  await page.waitForLoadState("networkidle")
+
+  await page.locator("#child-records-member").selectOption(member.userId)
+  await page.locator("#child-records-date").fill(deterministicNonFriday)
+  // Wait for controlled component to commit the non-Friday date
+  await expect(page.getByText(/مش يوم جمعة/)).toBeVisible()
+  // Wait until the day-view fully loads for the non-Friday date (the hint is
+  // rendered with the persisted view; the card showing "لم يُسجَّل بعد" proves
+  // the load settled and the record button is enabled).
+  const churchCard = page.getByTestId("attendance-card-CHURCH")
+  await expect(churchCard.getByText("لم يُسجَّل بعد")).toBeVisible()
+  await churchCard.getByRole("button", { name: "سجّل" }).click()
+  await expect(page.getByText("الحضور يُسجَّل يوم الجمعة فقط")).toBeVisible({ timeout: 10_000 })
+  await expect(churchCard.getByText("لم يُسجَّل بعد")).toBeVisible()
 })
 
 test("Servant history tab shows past dates read-only", async ({ page }) => {

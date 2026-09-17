@@ -165,6 +165,27 @@ function cairoToday(): string {
   }).format(new Date())
 }
 
+/**
+ * The Cairo date the server's attendance engine considers "now".
+ * When ATTENDANCE_TEST_NOW is set (dev/test only), derive the date from it so
+ * the test's direct DB writes land on the same Friday the server uses.
+ */
+function testAttendanceDate(): string {
+  const override = process.env.ATTENDANCE_TEST_NOW
+  if (override) {
+    const d = new Date(override)
+    if (!Number.isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d)
+    }
+  }
+  return cairoToday()
+}
+
 test.describe("PHASE 3 — Attendance + QR check-in", () => {
   const createdPhones: string[] = []
   let member: Awaited<ReturnType<typeof createUser>>
@@ -368,14 +389,14 @@ test.describe("PHASE 3 — Attendance + QR check-in", () => {
       .from("attendance_sessions")
       .select("id")
       .eq("type", "CHURCH")
-      .eq("session_date", cairoToday())
+      .eq("session_date", testAttendanceDate())
       .maybeSingle()
     const sessionId =
       session?.id ??
       (
         await admin
           .from("attendance_sessions")
-          .insert({ type: "CHURCH", title: "قداس", session_date: cairoToday() })
+          .insert({ type: "CHURCH", title: "قداس", session_date: testAttendanceDate() })
           .select("id")
           .single()
       ).data!.id

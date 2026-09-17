@@ -53,13 +53,15 @@ export async function getServantDayData(
     await Promise.all([
       admin
         .from("attendance_records")
-        .select("id, points, attended_at, session:attendance_sessions(type)")
+        .select("id, points, attended_at, session:attendance_sessions!inner(type)")
         .eq("profile_id", servantId)
         .neq("status", "ARCHIVED")
         .eq("session.session_date", cairoToday),
       admin
         .from("attendance_records")
-        .select("id, points, attended_at, session:attendance_sessions(type, session_date)")
+        .select(
+          "id, points, attended_at, session:attendance_sessions!inner(type, session_date)"
+        )
         .eq("profile_id", servantId)
         .neq("status", "ARCHIVED")
         .gte("session.session_date", historySince)

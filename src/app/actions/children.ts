@@ -223,7 +223,9 @@ export async function getChildDayViewAction(
   const [attendance, state, scores, recent] = await Promise.all([
     admin
       .from("attendance_records")
-      .select("id, attended_at, points, source, recorded_by, session:attendance_sessions(type)")
+      .select(
+        "id, attended_at, points, source, recorded_by, session:attendance_sessions!inner(type)"
+      )
       .eq("profile_id", memberId)
       .eq("session.session_date", date)
       .neq("status", "ARCHIVED"),

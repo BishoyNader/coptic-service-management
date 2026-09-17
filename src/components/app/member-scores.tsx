@@ -20,6 +20,8 @@ import { EmptyState } from "@/components/coptic/empty-state"
 import { formatArabicDate } from "@/lib/dates"
 import type { ScoreBreakdown, ScoreBreakdownEntry } from "@/services/scoring-rules"
 import type { MemberActivityView, MemberActivityDayEntry } from "@/services/member-scoring-service"
+import { MemberFridayResults } from "./member-friday-results"
+import type { FridayMemberView } from "@/services/friday-service"
 
 const ICONS: Record<string, LucideIcon> = {
   church: Church,
@@ -44,10 +46,12 @@ export function MemberScoresView({
   week,
   month,
   activity,
+  friday,
 }: {
   week: ScoreBreakdown
   month: ScoreBreakdown
   activity: MemberActivityView | null
+  friday: FridayMemberView
 }) {
   return (
     <div className="space-y-5">
@@ -66,6 +70,9 @@ export function MemberScoresView({
           <TabsTrigger value="week" className="flex-1">
             هذا الأسبوع
           </TabsTrigger>
+          <TabsTrigger value="friday" className="flex-1">
+            درجات الجمعة
+          </TabsTrigger>
           <TabsTrigger value="month" className="flex-1">
             هذا الشهر
           </TabsTrigger>
@@ -79,6 +86,10 @@ export function MemberScoresView({
 
         <TabsContent value="week" className="mt-4">
           <PeriodPanel breakdown={week} emptyText="لسه مفيش درجات للأسبوع ده" />
+        </TabsContent>
+
+        <TabsContent value="friday" className="mt-4">
+          <MemberFridayResults initial={friday} initialDate={friday.selected.date} />
         </TabsContent>
 
         <TabsContent value="month" className="mt-4">

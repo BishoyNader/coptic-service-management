@@ -187,6 +187,12 @@ export async function resolvePersonByProfileId(
  * session; the target person is resolved from a trusted identifier (QR
  * capability token or 6-digit code) that we look up server-side — never from
  * a client-provided user id.
+ *
+ * `sessionDate` is the Cairo wall-date of the session being recorded (always
+ * a Friday). For real-time check-ins it is derived from `now`; for
+ * backdated servant child-records it is the explicitly chosen date. The
+ * Friday validation is performed against `sessionDate` so both paths work
+ * correctly regardless of the current server clock.
  */
 async function executeCheckIn(
   admin: SupabaseAdminClient,
@@ -196,9 +202,12 @@ async function executeCheckIn(
     type: AttendanceType
     source: AttendanceSource
     now: Date
+    /** Cairo wall-date (YYYY-MM-DD) of the session. Defaults to cairoDateString(now). */
+    sessionDate?: string
   }
 ): Promise<CheckInOutcome> {
   const { actorId, person, type, source, now } = params
+  const cairoDate = params.sessionDate ?? cairoDateString(now)
 
   if (person.status !== "ACTIVE") {
     return { status: "error", message: "هذا الحساب غير نشط" }
@@ -207,7 +216,6 @@ async function executeCheckIn(
     return { status: "error", message: "هذا النوع من الحسابات لا يسجّل حضورًا" }
   }
 
-  const cairoDate = cairoDateString(now)
   if (!isCairoFriday(cairoDate)) {
     return { status: "error", message: "الحضور يُسجَّل يوم الجمعة فقط" }
   }
@@ -500,11 +508,13 @@ export async function correctAttendance(
     .eq("id", record.profile_id)
     .maybeSingle()
 
+  // Use the session's own date (already guaranteed Friday by the DB constraint
+  // and by executeCheckIn). Re-checking the original attended_at timestamp is
+  // wrong: it may cross midnight UTC while still being a Cairo-Friday session.
+  const cairoDate = session.session_date as string
+  // The original instant is still used for time-of-day band resolution so
+  // that a correction preserves the historical check-in time for scoring.
   const originalInstant = new Date(record.attended_at)
-  const cairoDate = cairoDateString(originalInstant)
-  if (!isCairoFriday(cairoDate)) {
-    return { ok: false, message: "الحضور يُسجَّل يوم الجمعة فقط" }
-  }
   const newSessionId = await ensureAttendanceSession(admin, newType, cairoDate, actorId)
 
   // No duplicate in the target session for the same person.
@@ -620,6 +630,7 @@ export async function recordChildAttendance(
     type,
     source: "MANUAL",
     now: cairoLocalToInstant(date, CHILD_ATTENDANCE_DEFAULT_TIMES[type]),
+    sessionDate: date,
   })
 }
 

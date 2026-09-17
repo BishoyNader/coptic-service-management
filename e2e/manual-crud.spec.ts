@@ -228,7 +228,11 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
       .getByRole("alertdialog")
       .getByRole("button", { name: "تفعيل الحساب" })
       .click()
-    await expect(page.getByText("نشط")).toBeVisible({ timeout: 15000 })
+    // Scope to the account-status section so the assertion doesn't conflict
+    // with navigation links that also contain the text "نشط".
+    await expect(
+      page.locator("div", { hasText: "حالة الحساب" }).last().getByText("نشط", { exact: true })
+    ).toBeVisible({ timeout: 15000 })
   })
 
   test("28. Admin-created users are recorded in the audit log", async () => {

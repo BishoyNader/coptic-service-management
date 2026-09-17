@@ -1,13 +1,16 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { getServerNow } from "@/services/attendance-service"
 import { cairoDateString } from "@/lib/cairo"
 import { formatArabicDate } from "@/lib/dates"
 import { fetchAttendanceBoardPageAction } from "@/app/actions/attendance"
+import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
 import { ServantAttendanceBoard } from "@/components/app/servant-attendance-board"
+import { FridayDashboard } from "@/components/app/friday-dashboard"
 
 export const metadata: Metadata = { title: "الحضور" }
 
@@ -18,16 +21,18 @@ export default async function ServantAttendancePage() {
 
   const today = cairoDateString(getServerNow())
 
-  const [servantsRes, membersRes, todayResult] = await Promise.all([
+  const [servantsRes, membersRes, todayResult, fridayGrid, fridayMinistry] = await Promise.all([
     fetchAttendanceBoardPageAction({ role: "SERVANT", query: "", offset: 0 }),
     fetchAttendanceBoardPageAction({ role: "SERVED_MEMBER", query: "", offset: 0 }),
     supabase
       .from("attendance_records")
       .select(
-        "profile_id, attended_at, points, source, status, session:attendance_sessions(type), subject:profiles!attendance_records_profile_id_fkey(role)"
+        "profile_id, attended_at, points, source, status, session:attendance_sessions!inner(type), subject:profiles!attendance_records_profile_id_fkey(role)"
       )
       .eq("session.session_date", today)
       .neq("status", "ARCHIVED"),
+    getFridayAttendanceGrid(createAdminClient(), today),
+    getFridayMinistryData(createAdminClient(), today),
   ])
 
   const todayRows = (todayResult.data ?? []) as unknown as {
@@ -51,18 +56,24 @@ export default async function ServantAttendancePage() {
   }
 
   return (
-    <ServantAttendanceBoard
-      initialServants={servantsRes.people}
-      initialMembers={membersRes.people}
-      servantsTotal={servantsRes.total}
-      membersTotal={membersRes.total}
-      summary={{
-        servantsPresent,
-        membersPresent,
-        ownPresent: subjects.has(profile.id),
-      }}
-      todayLabel={formatArabicDate(new Date())}
-      actorId={profile.id}
-    />
+    <div className="space-y-8">
+      <ServantAttendanceBoard
+        initialServants={servantsRes.people}
+        initialMembers={membersRes.people}
+        servantsTotal={servantsRes.total}
+        membersTotal={membersRes.total}
+        summary={{
+          servantsPresent,
+          membersPresent,
+          ownPresent: subjects.has(profile.id),
+        }}
+        todayLabel={formatArabicDate(new Date())}
+        actorId={profile.id}
+      />
+
+      <div className="border-t border-border pt-6">
+        <FridayDashboard initialGrid={fridayGrid} initialMinistry={fridayMinistry} />
+      </div>
+    </div>
   )
 }

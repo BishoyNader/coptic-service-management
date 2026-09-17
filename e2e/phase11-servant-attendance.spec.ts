@@ -176,7 +176,16 @@ test.describe("PHASE 11 — SERVANT attendance board", () => {
 
   test.beforeAll(async () => {
     admin = createAdminClient()
-    const today = cairoDateString(new Date())
+    // Use the same Cairo date the server's attendance engine treats as "now"
+    // (mirrors ATTENDANCE_TEST_NOW when set) so seeded sessions land on a Friday.
+    const today = (() => {
+      const override = process.env.ATTENDANCE_TEST_NOW
+      if (override) {
+        const d = new Date(override)
+        if (!Number.isNaN(d.getTime())) return cairoDateString(d)
+      }
+      return cairoDateString(new Date())
+    })()
     const runTag = Math.random().toString(36).slice(2, 7)
 
     superSeed = await createSuperAdmin(admin)

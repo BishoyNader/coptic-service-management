@@ -1,14 +1,14 @@
-import type { AppRole } from "./roles"
+import type { AppRole } from "./roles";
 
-export const APP_NAME = "خدمتي"
-export const APP_TAGLINE = "كنيسة السيدة العذراء وأي حوف"
+export const APP_NAME = "خدمتي";
+export const APP_TAGLINE = "كنيسة السيدة العذراء وأي حوف";
 
 /** App navigation configuration per role. */
 export type NavItem = {
-  href: string
-  label: string
-  icon: string
-}
+  href: string;
+  label: string;
+  icon: string;
+};
 
 export const MEMBER_NAV: NavItem[] = [
   { href: "/app/member", label: "الرئيسية", icon: "home" },
@@ -16,7 +16,7 @@ export const MEMBER_NAV: NavItem[] = [
   { href: "/app/member/scores", label: "الدرجات", icon: "star" },
   { href: "/app/member/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/member/account", label: "حسابي", icon: "user" },
-]
+];
 
 export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant", label: "الرئيسية", icon: "home" },
@@ -27,7 +27,7 @@ export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/servant/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/servant/account", label: "حسابي", icon: "user" },
-]
+];
 
 export const ADMIN_NAV: NavItem[] = [
   { href: "/app/admin", label: "الرئيسية", icon: "home" },
@@ -38,7 +38,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/app/admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/admin/reports", label: "التقارير", icon: "chart" },
   { href: "/app/admin/account", label: "حسابي", icon: "user" },
-]
+];
 
 export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin", label: "الرئيسية", icon: "home" },
@@ -51,22 +51,31 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin/activities", label: "الأنشطة", icon: "clipboard" },
   { href: "/app/servant/activities", label: "تسجيل الأنشطة", icon: "activity" },
   { href: "/app/super-admin/reports", label: "التقارير", icon: "chart" },
+  {
+    href: "/app/super-admin/study-years",
+    label: "أعوام الخدمة",
+    icon: "calendar",
+  },
   { href: "/app/super-admin/users", label: "المستخدمين", icon: "shield" },
-  { href: "/app/super-admin/audit-log", label: "سجل العمليات", icon: "history" },
+  {
+    href: "/app/super-admin/audit-log",
+    label: "سجل العمليات",
+    icon: "history",
+  },
   { href: "/app/super-admin/settings", label: "الإعدادات", icon: "settings" },
   { href: "/app/super-admin/account", label: "حسابي", icon: "user" },
-]
+];
 
 export function navForRole(role: AppRole): NavItem[] {
   switch (role) {
     case "SERVED_MEMBER":
-      return MEMBER_NAV
+      return MEMBER_NAV;
     case "SERVANT":
-      return SERVANT_NAV
+      return SERVANT_NAV;
     case "ADMIN":
-      return ADMIN_NAV
+      return ADMIN_NAV;
     case "SUPER_ADMIN":
-      return SUPER_ADMIN_NAV
+      return SUPER_ADMIN_NAV;
   }
 }
 
@@ -74,7 +83,7 @@ export function navForRole(role: AppRole): NavItem[] {
  * A served member uses every nav item as a bottom tab except this many
  * "overflow" items which move to a menu on small screens.
  */
-export const MOBILE_TAB_LIMIT = 5
+export const MOBILE_TAB_LIMIT = 5;
 
 export const SCORING_CATEGORY_LABELS = {
   CHURCH_ATTENDANCE: "حضور القداس",
@@ -85,9 +94,9 @@ export const SCORING_CATEGORY_LABELS = {
   BONUS: "إضافي",
   MONTHLY_ACTIVITY: "نشاط",
   SERVICE_COMMITMENT: "التزام الخدمة",
-} as const
+} as const;
 
-export type ScoringCategory = keyof typeof SCORING_CATEGORY_LABELS
+export type ScoringCategory = keyof typeof SCORING_CATEGORY_LABELS;
 
 /**
  * Attendance contexts, mirroring the `attendance_type` enum values.
@@ -100,16 +109,16 @@ export const NOTIFICATION_AUDIENCE_LABELS = {
   SERVED_MEMBER: "المخدومين",
   SERVANT: "الخدام",
   ADMIN: "المسؤولين",
-} as const
+} as const;
 
 export const ATTENDANCE_TYPE_LABELS = {
   CHURCH: "حضور القداس",
   SERVICE: "حضور الخدمة",
-} as const
+} as const;
 
 /** How an attendance record was created. */
 export const ATTENDANCE_SOURCE_LABELS = {
   QR: "QR",
   CODE: "كود يدوي",
   MANUAL: "تسجيل يدوي",
-} as const
+} as const;

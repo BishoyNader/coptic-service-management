@@ -2,15 +2,18 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { ScanLine } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { toAttendanceRows } from "@/services/attendance-service"
 import { ROLES } from "@/lib/roles"
 import { cairoDateString, daysAgoUtcISO } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
+import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceManagement } from "@/components/app/attendance-management"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
 import { ManualAttendanceDialog } from "@/components/app/manual-attendance-dialog"
+import { FridayDashboard } from "@/components/app/friday-dashboard"
 import { ATTENDANCE_PAGE_SIZE } from "@/lib/pagination"
 import { loadMoreAttendanceAction } from "@/app/actions/listing"
 
@@ -50,8 +53,13 @@ export default async function SuperAdminAttendancePage() {
     phone: p.phone as string,
   }))
 
+  const [fridayGrid, fridayMinistry] = await Promise.all([
+    getFridayAttendanceGrid(createAdminClient(), cairoDateString(getServerNow())),
+    getFridayMinistryData(createAdminClient(), cairoDateString(getServerNow())),
+  ])
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="font-heading text-xl font-extrabold">سجل الحضور</h1>
@@ -70,7 +78,7 @@ export default async function SuperAdminAttendancePage() {
         <EmptyState
           icon={<ScanLine className="size-7" />}
           title="مفيش سجلات حضور"
-          description="ابدأ بتسجيل أول حضور 📷"
+          description="ابدأ بتسجيل أول حضور"
         />
       ) : (
         <>
@@ -80,6 +88,10 @@ export default async function SuperAdminAttendancePage() {
           </p>
         </>
       )}
+
+      <div className="border-t border-border pt-6">
+        <FridayDashboard initialGrid={fridayGrid} initialMinistry={fridayMinistry} />
+      </div>
     </div>
   )
 }

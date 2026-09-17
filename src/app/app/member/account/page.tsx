@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES, ROLE_LABELS } from "@/lib/roles"
 import { ProfileForm } from "@/components/app/profile-form"
+import { ProfileImageUploader } from "@/components/app/profile-image-uploader"
 import { updateProfileAction } from "@/app/actions/profile"
 
 export const metadata: Metadata = { title: "حسابي" }
@@ -22,12 +23,15 @@ export default async function MemberAccountPage() {
   return (
     <div className="mx-auto max-w-md">
       <h1 className="mb-4 font-heading text-xl font-extrabold">حسابي</h1>
-      <ProfileForm
-        profile={profile}
-        role="member"
-        personalCode={codes?.code}
-        onSubmit={updateProfileAction}
-      />
+      <div className="space-y-4">
+        <ProfileImageUploader profile={profile} />
+        <ProfileForm
+          profile={profile}
+          role="member"
+          personalCode={codes?.code}
+          onSubmit={updateProfileAction}
+        />
+      </div>
       <p className="mt-4 text-center text-xs text-muted-foreground">
         نوع الحساب: {ROLE_LABELS[profile.role]}
       </p>

@@ -152,14 +152,41 @@ async function login(page: Page, seed: Seed) {
 }
 
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date())
-const twoDaysAgo = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Africa/Cairo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-})
-  .format(new Date(Date.now() - 2 * 86_400_000))
-  .slice(0, 10)
+
+/**
+ * The Cairo date the server's attendance engine treats as "now".
+ * Mirrors ATTENDANCE_TEST_NOW so test-side DB writes land on the same Friday
+ * the server uses for real-time check-ins.
+ */
+function testAttendanceDate(): string {
+  const override = process.env.ATTENDANCE_TEST_NOW
+  if (override) {
+    const d = new Date(override)
+    if (!Number.isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d)
+    }
+  }
+  return today
+}
+
+/** The Friday immediately before testAttendanceDate — used for backdate tests. */
+function previousTestFriday(): string {
+  const override = process.env.ATTENDANCE_TEST_NOW
+  const base = override ? new Date(override) : new Date()
+  // Go back 7 days from the test Friday to get the previous Friday.
+  const prev = new Date(base.getTime() - 7 * 86_400_000)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(prev)
+}
 
 // ─── Nav ────────────────────────────────────────────────────────────────────
 test("SERVANT nav shows new tabs", async ({ page }) => {
@@ -185,6 +212,10 @@ test("Servant records CHURCH attendance then remove button appears", async ({ pa
   await page.goto("/app/servant/children")
   await page.waitForLoadState("networkidle")
 
+  // Select a known Friday so the Friday-only attendance rule is satisfied.
+  await page.getByLabel("تاريخ السجل").fill(testAttendanceDate())
+  await page.waitForLoadState("networkidle")
+
   const card = page.locator("[data-testid='attendance-card-CHURCH']")
   await expect(card).toBeVisible()
   const recordBtn = card.getByRole("button", { name: "سجّل" })
@@ -198,6 +229,10 @@ test("Servant records CHURCH attendance then remove button appears", async ({ pa
 test("Servant removes own CHURCH attendance", async ({ page }) => {
   await login(page, servant)
   await page.goto("/app/servant/children")
+  await page.waitForLoadState("networkidle")
+
+  // Use the same Friday so we're looking at the record created in the previous test.
+  await page.getByLabel("تاريخ السجل").fill(testAttendanceDate())
   await page.waitForLoadState("networkidle")
 
   const card = page.locator("[data-testid='attendance-card-CHURCH']")
@@ -233,7 +268,9 @@ test("Servant records SERVICE attendance for a past date", async ({ page }) => {
   await page.goto("/app/servant/children")
   await page.waitForLoadState("networkidle")
 
-  await page.getByLabel("تاريخ السجل").fill(twoDaysAgo)
+  // Use the Friday before the test Friday — satisfies the Friday-only rule
+  // while being a genuine past date relative to the test clock.
+  await page.getByLabel("تاريخ السجل").fill(previousTestFriday())
   await page.waitForLoadState("networkidle")
 
   const card = page.locator("[data-testid='attendance-card-SERVICE']")

@@ -104,7 +104,9 @@ export async function getScoringBoardData(
     listActiveMembers(admin),
     admin
       .from("attendance_records")
-      .select("id, profile_id, points, recorded_by, session:attendance_sessions(type)")
+      .select(
+        "id, profile_id, points, recorded_by, session:attendance_sessions!inner(type)"
+      )
       .neq("status", "ARCHIVED")
       .eq("session.session_date", date),
     admin

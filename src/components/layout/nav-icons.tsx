@@ -15,8 +15,9 @@ import {
   ClipboardList,
   Menu,
   Activity,
+  CalendarDays,
   type LucideIcon,
-} from "lucide-react"
+} from "lucide-react";
 
 export const NAV_ICONS: Record<string, LucideIcon> = {
   home: Home,
@@ -34,9 +35,10 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   settings: Settings,
   clipboard: ClipboardList,
   activity: Activity,
+  calendar: CalendarDays,
   menu: Menu,
-}
+};
 
 export function navIcon(name: string): LucideIcon {
-  return NAV_ICONS[name] ?? Bell
+  return NAV_ICONS[name] ?? Bell;
 }

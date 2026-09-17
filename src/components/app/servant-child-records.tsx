@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Check,
@@ -18,7 +18,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { formatArabicDate } from "@/lib/dates"
-import { formatCairoTime, isCairoFriday, mostRecentCairoFriday } from "@/lib/cairo"
+import {
+  cairoDateString,
+  formatCairoTime,
+  isCairoFriday,
+} from "@/lib/cairo"
 import { ATTENDANCE_TYPE_LABELS, SCORING_CATEGORY_LABELS } from "@/lib/constants"
 import {
   getChildDayViewAction,
@@ -51,10 +55,14 @@ export function ServantChildRecords({
   minDate: string
 }) {
   const router = useRouter()
-  const lastFriday = cairoDateString(mostRecentCairoFriday())
+  const cairoToday = cairoDateString(new Date())
 
   const [memberId, setMemberId] = useState<string>(members[0]?.id ?? "")
-  const [date, setDate] = useState(lastFriday)
+  const [date, setDate] = useState(cairoToday)
+  // Tracks the most recent load request so an out-of-order response (e.g. a
+  // slower load for a previously-selected date) cannot overwrite the view for
+  // the currently-selected member/date.
+  const loadSeq = useRef(0)
   const [view, setView] = useState<ChildView | null>(null)
   const [loading, setLoading] = useState(false)
   const [busyType, setBusyType] = useState<AttendanceType | null>(null)
@@ -76,8 +84,11 @@ export function ServantChildRecords({
         setView(null)
         return
       }
+      loadSeq.current += 1
+      const seq = loadSeq.current
       setLoading(true)
       const res = await getChildDayViewAction(profileId, when)
+      if (seq !== loadSeq.current) return
       setLoading(false)
       if (!res.ok) {
         setView(null)
@@ -203,8 +214,8 @@ export function ServantChildRecords({
             type="date"
             value={date}
             min={minDate}
-            max={today}
-            onChange={(e) => setDate(e.target.value || today)}
+            max={cairoToday}
+            onChange={(e) => setDate(e.target.value || cairoToday)}
             className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
           />
         </div>
@@ -293,7 +304,14 @@ export function ServantChildRecords({
               })}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              يمكنك تسجيل حضور أي يوم حتى اليوم — تكرار نفس النوع في نفس اليوم لا يُسجَّل مرتين
+              {isFriday ? (
+                <>يوم جمعة — التسجيل للجمعة ده مفعّل بالكامل. تكرار نفس النوع في نفس اليوم لا يُسجَّل مرتين</>
+              ) : (
+                <>
+                  {formatArabicDate(date)} مش يوم جمعة — الحضور بيُسجَّل يوم الجمعة فقط،
+                  والدرجات بتتحسب تلقائيًا لجُمعة الأسبوع ده
+                </>
+              )}
             </p>
           </section>
 

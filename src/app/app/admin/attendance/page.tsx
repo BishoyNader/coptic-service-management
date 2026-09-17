@@ -2,15 +2,19 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { ScanLine, History } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { toAttendanceRows } from "@/services/attendance-service"
 import { ROLES } from "@/lib/roles"
 import { cairoDayEnd, cairoDayStart, cairoDateString } from "@/lib/cairo"
 import { ATTENDANCE_TYPE_LABELS, ATTENDANCE_SOURCE_LABELS } from "@/lib/constants"
 import { formatCairoTime } from "@/lib/cairo"
+import { getServerNow } from "@/services/attendance-service"
+import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
 import { ManualAttendanceDialog } from "@/components/app/manual-attendance-dialog"
+import { FridayDashboard } from "@/components/app/friday-dashboard"
 import { NileDivider } from "@/components/coptic/brand"
 
 export const metadata: Metadata = { title: "تسجيل حضور" }
@@ -54,8 +58,13 @@ export default async function AdminAttendancePage() {
 
   const today = cairoDateString(now)
 
+  const [fridayGrid, fridayMinistry] = await Promise.all([
+    getFridayAttendanceGrid(createAdminClient(), cairoDateString(getServerNow())),
+    getFridayMinistryData(createAdminClient(), cairoDateString(getServerNow())),
+  ])
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <div>
         <h1 className="font-heading text-xl font-extrabold">تسجيل حضور</h1>
         <p className="text-sm text-muted-foreground">قاعةُ الخدمة — اليوم {today}</p>
@@ -75,7 +84,7 @@ export default async function AdminAttendancePage() {
         <EmptyState
           icon={<ScanLine className="size-7" />}
           title="لسه مفيش حضور النهارده"
-          description="ابدأ بتسجيل أول حضور 📷"
+          description="ابدأ بتسجيل أول حضور"
         />
       ) : (
         <div className="space-y-2">
@@ -114,6 +123,11 @@ export default async function AdminAttendancePage() {
         <History className="size-4" />
         التاريخ الكامل والقدرة على تصحيح السجلات متاحان لمسؤول الخدمة العامة
       </div>
+
+      <div className="border-t border-border pt-6">
+        <FridayDashboard initialGrid={fridayGrid} initialMinistry={fridayMinistry} />
+      </div>
+
       <NileDivider className="mx-auto w-2/3" />
     </div>
   )

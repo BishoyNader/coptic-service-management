@@ -320,7 +320,7 @@ export async function loadTodayAttendanceByIds(
   const { data } = await supabase
     .from("attendance_records")
     .select(
-      "profile_id, attended_at, points, source, status, session:attendance_sessions(type)"
+      "profile_id, attended_at, points, source, status, session:attendance_sessions!inner(type)"
     )
     .eq("session.session_date", today)
     .neq("status", "ARCHIVED")
