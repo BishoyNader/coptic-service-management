@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/coptic/empty-state"
 import { AddUserButton } from "@/components/app/add-user-button"
 import { PaginationControls } from "@/components/app/pagination-controls"
 import { ExportButton } from "@/components/app/export-button"
+import { ImportUsersButton } from "@/components/app/import-users-button"
 import { exportMembersAction } from "@/app/actions/exports"
 
 export const metadata: Metadata = { title: "المخدومين" }
@@ -57,6 +58,7 @@ export default async function SuperAdminMembersPage({
         </div>
         <div className="flex items-center gap-2">
           <ExportButton action={exportMembersAction} label="تصدير CSV" />
+          <ImportUsersButton role="SERVED_MEMBER" label="استيراد" />
           <AddUserButton label="إضافة مخدوم" defaultRole="SERVED_MEMBER" />
         </div>
       </div>

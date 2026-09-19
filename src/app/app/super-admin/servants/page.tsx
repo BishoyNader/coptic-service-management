@@ -8,6 +8,7 @@ import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AddUserButton } from "@/components/app/add-user-button"
 import { PaginationControls } from "@/components/app/pagination-controls"
+import { ImportUsersButton } from "@/components/app/import-users-button"
 
 export const metadata: Metadata = { title: "الخدام" }
 
@@ -44,7 +45,10 @@ export default async function SuperAdminServantsPage({
           <h1 className="font-heading text-xl font-extrabold">الخدام</h1>
           <p className="text-sm text-muted-foreground">{total} خادم</p>
         </div>
-        <AddUserButton label="إضافة خادم" defaultRole="SERVANT" />
+        <div className="flex items-center gap-2">
+          <ImportUsersButton role="SERVANT" label="استيراد" />
+          <AddUserButton label="إضافة خادم" defaultRole="SERVANT" />
+        </div>
       </div>
 
       {!servants || servants.length === 0 ? (
