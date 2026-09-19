@@ -10,6 +10,7 @@ import {
   correctAttendance,
   getServerNow,
   recordManualAttendance,
+  recordServantAttendance,
   resolvePersonByIdentifier,
   type AttendanceCorrection,
 } from "@/services/attendance-service"
@@ -387,4 +388,52 @@ export async function loadTodayAttendanceByIds(
     })
   }
   return map
+}
+
+/**
+ * Servant marks their own attendance with a single tap — no type selection,
+ * no time-band scoring. Just "present".
+ */
+export async function markServantAttendanceAction(): Promise<RecordAttendanceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { status: "error", message: "غير مصرح" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!profile || profile.role !== ROLES.SERVANT) {
+    return { status: "error", message: "هذه العملية للخدام فقط" }
+  }
+
+  const admin = createAdminClient()
+  const outcome = await recordServantAttendance(admin, {
+    actorId: user.id,
+  })
+
+  if (outcome.status === "error") return outcome
+  if (outcome.status === "success") {
+    return {
+      status: "success",
+      person: outcome.person,
+      attendedAt: outcome.attendedAt,
+      cairoTime: outcome.cairoTime,
+      type: outcome.type,
+      source: outcome.source,
+      points: outcome.points,
+      ruleName: outcome.ruleName,
+    }
+  }
+  return {
+    status: "duplicate",
+    person: outcome.person,
+    attendedAt: outcome.attendedAt,
+    type: outcome.type,
+    points: outcome.points,
+  }
 }

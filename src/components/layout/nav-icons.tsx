@@ -16,6 +16,7 @@ import {
   Menu,
   Activity,
   CalendarDays,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   clipboard: ClipboardList,
   activity: Activity,
   calendar: CalendarDays,
+  "book-open": BookOpen,
   menu: Menu,
 };
 

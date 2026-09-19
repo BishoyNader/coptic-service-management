@@ -15,6 +15,7 @@ import {
   resolveAttendanceBand,
   type AttendanceRuleResolution,
 } from "./attendance-rules"
+import { periodKeyForDate } from "./scoring-rules"
 
 /**
  * Authoritative "now" for the attendance engine.
@@ -260,6 +261,17 @@ async function executeCheckIn(
     points = resolution.points
   }
 
+  // Compute period key for score_records so the weekly/monthly engine
+  // can aggregate attendance-derived scores correctly.
+  const scoreCategory =
+    person.role === "SERVED_MEMBER" ? attendanceCategory(type) : null
+  const periodKey = scoreCategory
+    ? periodKeyForDate(
+        scoreCategory === "MONTHLY_ACTIVITY" ? "MONTHLY" : "WEEKLY",
+        cairoDate
+      )
+    : null
+
   // Attendance + earned score persisted atomically in one DB transaction
   // (record_attendance_with_score). The partial unique index is internal to
   // the function, so a concurrent double check-in resolves to "duplicate".
@@ -272,12 +284,10 @@ async function executeCheckIn(
       p_points: points,
       p_recorded_by: actorId,
       p_source: source,
-      p_score_category:
-        points > 0 && person.role === "SERVED_MEMBER"
-          ? attendanceCategory(type)
-          : null,
+      p_score_category: scoreCategory,
       p_score_rule_id: resolution.rule?.id ?? null,
       p_session_date: cairoDate,
+      p_period_key: periodKey,
     }
   )
 
@@ -550,6 +560,7 @@ export async function correctAttendance(
     role
   )
   const newPoints = role === "SERVED_MEMBER" ? resolution.points : 0
+  const corrScoreCategory = role === "SERVED_MEMBER" ? attendanceCategory(newType) : null
 
   // Attendance move + score resize/void persisted atomically in one DB
   // transaction (correct_attendance_type). The unique target-session check
@@ -560,7 +571,7 @@ export async function correctAttendance(
       p_record_id: recordId,
       p_new_session_id: newSessionId,
       p_new_points: newPoints,
-      p_score_category: newPoints > 0 ? attendanceCategory(newType) : null,
+      p_score_category: corrScoreCategory,
       p_score_rule_id: resolution.rule?.id ?? null,
       p_session_date: cairoDate,
       p_actor_id: actorId,
@@ -756,4 +767,110 @@ export async function removeServantChildAttendance(
   })
 
   return { ok: true, message: "تم حذف تسجيل الحضور" }
+}
+
+/**
+ * Servant marks their own attendance with a single tap — no type selection,
+ * no time-band scoring. Uses CHURCH as the default internal type and records
+ * the current instant. Points are always 0 for servants.
+ */
+export async function recordServantAttendance(
+  admin: SupabaseAdminClient,
+  params: { actorId: string }
+): Promise<CheckInOutcome> {
+  const { actorId } = params
+  const now = getServerNow()
+  const cairoDate = cairoDateString(now)
+
+  const person = await resolvePersonByProfileId(admin, actorId)
+  if (!person) return { status: "error", message: "الشخص غير موجود" }
+  if (person.role !== ROLES.SERVANT) {
+    return { status: "error", message: "هذه العملية للخدام فقط" }
+  }
+  if (person.status !== "ACTIVE") {
+    return { status: "error", message: "هذا الحساب غير نشط" }
+  }
+
+  const sessionId = await ensureAttendanceSession(admin, "CHURCH", cairoDate, actorId)
+
+  const { data: existing } = await admin
+    .from("attendance_records")
+    .select("id, attended_at, points")
+    .eq("profile_id", actorId)
+    .eq("session_id", sessionId)
+    .neq("status", "ARCHIVED")
+    .maybeSingle()
+
+  if (existing) {
+    return {
+      status: "duplicate",
+      person: personToOutcome(person),
+      attendedAt: existing.attended_at,
+      type: "CHURCH",
+      points: Number(existing.points),
+    }
+  }
+
+  const { data: rpcData, error: rpcError } = await admin.rpc(
+    "record_attendance_with_score",
+    {
+      p_session_id: sessionId,
+      p_profile_id: actorId,
+      p_attended_at: now.toISOString(),
+      p_points: 0,
+      p_recorded_by: actorId,
+      p_source: "MANUAL",
+      p_score_category: null,
+      p_score_rule_id: null,
+      p_session_date: cairoDate,
+    }
+  )
+
+  if (rpcError) {
+    return { status: "error", message: "تعذر تسجيل الحضور" }
+  }
+
+  const result = rpcData as unknown as {
+    status: string
+    id: string
+    attended_at: string
+    points: number | string
+  }
+
+  if (result.status === "duplicate") {
+    return {
+      status: "duplicate",
+      person: personToOutcome(person),
+      attendedAt: result.attended_at,
+      type: "CHURCH",
+      points: Number(result.points),
+    }
+  }
+
+  await logAudit(admin, {
+    actorId,
+    action: "ATTENDANCE_MANUAL",
+    entity: "ATTENDANCE",
+    entityId: result.id,
+    metadata: {
+      profile_id: actorId,
+      subject_role: "SERVANT",
+      attended_at: now.toISOString(),
+      type: "CHURCH",
+      source: "MANUAL",
+      points: 0,
+      session_id: sessionId,
+      outcome: "success",
+    },
+  })
+
+  return {
+    status: "success",
+    person: personToOutcome(person),
+    attendedAt: now.toISOString(),
+    cairoTime: cairoTimeString(now),
+    type: "CHURCH",
+    source: "MANUAL",
+    points: 0,
+  }
 }

@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/coptic/empty-state"
 import { formatArabicDate } from "@/lib/dates"
 import { formatCairoTime } from "@/lib/cairo"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
-import { manualAttendanceAction } from "@/app/actions/attendance"
+import { markServantAttendanceAction } from "@/app/actions/attendance"
 import { ServantActivityPanel } from "@/components/app/servant-activity-panel"
 import type { AttendanceType } from "@/lib/types"
 
@@ -25,11 +25,10 @@ export type MyDayAttendance = {
 /**
  * Servant's own day: today's attendance (record your presence in one tap)
  * plus a recent two-week attendance summary above the standard activity
- * panel. Attendance writes go through the server-side manualAttendanceAction
- * (the board's ordinary path), so the engine's time/duplicate rules hold.
+ * panel. Attendance writes go through the server-side markServantAttendanceAction,
+ * which simply records presence without time-band scoring.
  */
 export function ServantMyDay({
-  profileId,
   cairoToday,
   minDate,
   todayAttendance,
@@ -55,21 +54,21 @@ export function ServantMyDay({
   onChanged?: () => void
 }) {
   const router = useRouter()
-  const [busy, setBusy] = useState<AttendanceType | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  const present = (type: AttendanceType) =>
-    todayAttendance.find((t) => t.type === type) ?? null
+  const todayPresent = todayAttendance.length > 0
+  const latestRecord = todayAttendance[0] ?? null
 
-  const handleRecord = async (type: AttendanceType) => {
-    setBusy(type)
-    const res = await manualAttendanceAction(profileId, type)
-    setBusy(null)
+  const handleRecord = async () => {
+    setBusy(true)
+    const res = await markServantAttendanceAction()
+    setBusy(false)
     if (res.status === "success") {
-      toast.success(`تم تسجيل الحضور (${res.points} نقطة)`)
+      toast.success("تم تسجيل الحضور")
       if (!embedded) router.refresh()
       onChanged?.()
     } else if (res.status === "duplicate") {
-      toast.info(res.message)
+      toast.info("تم تسجيل حضورك بالفعل")
       if (!embedded) router.refresh()
       onChanged?.()
     } else {
@@ -95,54 +94,58 @@ export function ServantMyDay({
         <h2 className="font-heading text-sm font-bold text-muted-foreground">
           حضور اليوم — {formatArabicDate(cairoToday)}
         </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {(["CHURCH", "SERVICE"] as AttendanceType[]).map((type) => {
-            const record = present(type)
-            return (
-              <div
-                key={type}
-                data-testid="my-day-attendance-card"
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5",
-                  record && "ring-coptic-teal/30"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={cn(
-                      "flex size-11 shrink-0 items-center justify-center rounded-xl",
-                      record ? "bg-coptic-teal/15 text-coptic-teal" : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    <Church className="size-5" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium">{ATTENDANCE_TYPE_LABELS[type]}</p>
-                    {record ? (
-                      <p className="flex items-center gap-1 text-[11px] text-coptic-teal">
-                        <Check className="size-3" />
-                        تم تسجيله — +{record.points} · {formatCairoTime(record.attendedAt)}
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground">لم يسجّل حضورك بعد</p>
-                    )}
-                  </div>
-                </div>
-                {!record && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleRecord(type)}
-                    disabled={busy !== null}
-                    className="h-9 gap-1"
-                  >
-                    {busy === type ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-                    سجّل
-                  </Button>
-                )}
-              </div>
-            )
-          })}
+        <div
+          data-testid="my-day-attendance-card"
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5",
+            todayPresent && "ring-coptic-teal/30"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                todayPresent
+                  ? "bg-coptic-teal/15 text-coptic-teal"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              <Church className="size-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">حضور اليوم</p>
+              {todayPresent && latestRecord ? (
+                <p className="flex items-center gap-1 text-[11px] text-coptic-teal">
+                  <Check className="size-3" />
+                  تم تسجيله — {formatCairoTime(latestRecord.attendedAt)}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">لم يسجّل حضورك بعد</p>
+              )}
+            </div>
+          </div>
+          {!todayPresent && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleRecord()}
+              disabled={busy}
+              className="h-9 gap-1"
+            >
+              {busy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Check className="size-3.5" />
+              )}
+              سجّل حضوري
+            </Button>
+          )}
+          {todayPresent && (
+            <span className="flex items-center gap-1.5 rounded-full bg-coptic-teal/10 px-3 py-1.5 text-xs font-bold text-coptic-teal">
+              <Check className="size-3.5" />
+              حاضر
+            </span>
+          )}
         </div>
       </section>
 
@@ -174,7 +177,6 @@ export function ServantMyDay({
                     <Clock className="inline size-3" /> {formatCairoTime(r.attendedAt)}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-coptic-gold">+{r.points}</span>
               </div>
             ))}
           </div>
