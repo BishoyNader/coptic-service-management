@@ -240,18 +240,25 @@ async function executeCheckIn(
     }
   }
 
-  const { data: rules } = await admin
-    .from("scoring_rules")
-    .select("*")
-    .in("category", ["CHURCH_ATTENDANCE", "SERVICE_ATTENDANCE"])
+  // Servants are tracked as present/absent only — no scoring, no time bands.
+  // Scoring rules apply only to served members.
+  let points = 0
+  let resolution: AttendanceRuleResolution = { points: 0, rule: null }
 
-  const resolution: AttendanceRuleResolution = resolveAttendanceBand(
-    type,
-    now,
-    (rules ?? []) as Parameters<typeof resolveAttendanceBand>[2],
-    person.role
-  )
-  const points = resolution.points
+  if (person.role === "SERVED_MEMBER") {
+    const { data: rules } = await admin
+      .from("scoring_rules")
+      .select("*")
+      .in("category", ["CHURCH_ATTENDANCE", "SERVICE_ATTENDANCE"])
+
+    resolution = resolveAttendanceBand(
+      type,
+      now,
+      (rules ?? []) as Parameters<typeof resolveAttendanceBand>[2],
+      person.role
+    )
+    points = resolution.points
+  }
 
   // Attendance + earned score persisted atomically in one DB transaction
   // (record_attendance_with_score). The partial unique index is internal to
