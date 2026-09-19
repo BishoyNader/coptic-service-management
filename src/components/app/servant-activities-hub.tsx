@@ -121,6 +121,7 @@ export function ServantActivitiesHub({
             activities={day.activities}
             history={day.history}
             embedded
+            showAttendance={false}
             onChanged={handleChanged}
           />
         ) : (

@@ -790,6 +790,9 @@ export async function recordServantAttendance(
   if (person.status !== "ACTIVE") {
     return { status: "error", message: "هذا الحساب غير نشط" }
   }
+  if (!isCairoFriday(cairoDate)) {
+    return { status: "error", message: "الحضور يُسجَّل يوم الجمعة فقط" }
+  }
 
   const sessionId = await ensureAttendanceSession(admin, "CHURCH", cairoDate, actorId)
 

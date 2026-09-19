@@ -36,6 +36,7 @@ export function ServantMyDay({
   activities,
   history,
   embedded = false,
+  showAttendance = true,
   servantId,
   onChanged,
 }: {
@@ -48,6 +49,8 @@ export function ServantMyDay({
   history: { activityId: string; recordedOn: string }[]
   /** Render inside another page (hide the page heading). */
   embedded?: boolean
+  /** Show attendance section — false when rendered from activities hub. */
+  showAttendance?: boolean
   /** Subject servant when recording on behalf of another servant (super admin). */
   servantId?: string
   /** Called after any successful write so the parent can refresh its data. */
@@ -89,99 +92,103 @@ export function ServantMyDay({
         </div>
       )}
 
-      {/* Own attendance — today */}
-      <section aria-label="حضور اليوم" className="space-y-2">
-        <h2 className="font-heading text-sm font-bold text-muted-foreground">
-          حضور اليوم — {formatArabicDate(cairoToday)}
-        </h2>
-        <div
-          data-testid="my-day-attendance-card"
-          className={cn(
-            "flex items-center justify-between gap-3 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5",
-            todayPresent && "ring-coptic-teal/30"
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <span
+      {showAttendance && (
+        <>
+          {/* Own attendance — today */}
+          <section aria-label="حضور اليوم" className="space-y-2">
+            <h2 className="font-heading text-sm font-bold text-muted-foreground">
+              حضور اليوم — {formatArabicDate(cairoToday)}
+            </h2>
+            <div
+              data-testid="my-day-attendance-card"
               className={cn(
-                "flex size-11 shrink-0 items-center justify-center rounded-xl",
-                todayPresent
-                  ? "bg-coptic-teal/15 text-coptic-teal"
-                  : "bg-muted text-muted-foreground"
+                "flex items-center justify-between gap-3 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5",
+                todayPresent && "ring-coptic-teal/30"
               )}
             >
-              <Church className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-sm font-medium">حضور اليوم</p>
-              {todayPresent && latestRecord ? (
-                <p className="flex items-center gap-1 text-[11px] text-coptic-teal">
-                  <Check className="size-3" />
-                  تم تسجيله — {formatCairoTime(latestRecord.attendedAt)}
-                </p>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">لم يسجّل حضورك بعد</p>
-              )}
-            </div>
-          </div>
-          {!todayPresent && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void handleRecord()}
-              disabled={busy}
-              className="h-9 gap-1"
-            >
-              {busy ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Check className="size-3.5" />
-              )}
-              سجّل حضوري
-            </Button>
-          )}
-          {todayPresent && (
-            <span className="flex items-center gap-1.5 rounded-full bg-coptic-teal/10 px-3 py-1.5 text-xs font-bold text-coptic-teal">
-              <Check className="size-3.5" />
-              حاضر
-            </span>
-          )}
-        </div>
-      </section>
-
-      {/* Own attendance — recent two weeks */}
-      <section aria-label="حضور آخر أسبوعين" className="space-y-2">
-        <h2 className="font-heading text-sm font-bold text-muted-foreground">
-          حضور آخر أسبوعين
-        </h2>
-        {recentAttendance.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card/60 px-4 py-6 text-center text-sm text-muted-foreground">
-            <CalendarDays className="mx-auto mb-2 size-5" />
-            لا يوجد حضور مسجّل في آخر أسبوعين
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {recentAttendance.map((r) => (
-              <div
-                key={r.id}
-                data-testid="my-day-recent-item"
-                className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-coptic-teal/10 text-coptic-teal">
-                  <Check className="size-4" aria-hidden="true" />
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                    todayPresent
+                      ? "bg-coptic-teal/15 text-coptic-teal"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  <Church className="size-5" aria-hidden="true" />
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{formatArabicDate(r.date ?? "")}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {ATTENDANCE_TYPE_LABELS[r.type]} ·{" "}
-                    <Clock className="inline size-3" /> {formatCairoTime(r.attendedAt)}
-                  </p>
+                <div>
+                  <p className="text-sm font-medium">حضور اليوم</p>
+                  {todayPresent && latestRecord ? (
+                    <p className="flex items-center gap-1 text-[11px] text-coptic-teal">
+                      <Check className="size-3" />
+                      تم تسجيله — {formatCairoTime(latestRecord.attendedAt)}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">لم يسجّل حضورك بعد</p>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+              {!todayPresent && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleRecord()}
+                  disabled={busy}
+                  className="h-9 gap-1"
+                >
+                  {busy ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )}
+                  سجّل حضوري
+                </Button>
+              )}
+              {todayPresent && (
+                <span className="flex items-center gap-1.5 rounded-full bg-coptic-teal/10 px-3 py-1.5 text-xs font-bold text-coptic-teal">
+                  <Check className="size-3.5" />
+                  حاضر
+                </span>
+              )}
+            </div>
+          </section>
+
+          {/* Own attendance — recent two weeks */}
+          <section aria-label="حضور آخر أسبوعين" className="space-y-2">
+            <h2 className="font-heading text-sm font-bold text-muted-foreground">
+              حضور آخر أسبوعين
+            </h2>
+            {recentAttendance.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border bg-card/60 px-4 py-6 text-center text-sm text-muted-foreground">
+                <CalendarDays className="mx-auto mb-2 size-5" />
+                لا يوجد حضور مسجّل في آخر أسبوعين
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recentAttendance.map((r) => (
+                  <div
+                    key={r.id}
+                    data-testid="my-day-recent-item"
+                    className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5"
+                  >
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-coptic-teal/10 text-coptic-teal">
+                      <Check className="size-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{formatArabicDate(r.date ?? "")}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {ATTENDANCE_TYPE_LABELS[r.type]} ·{" "}
+                        <Clock className="inline size-3" /> {formatCairoTime(r.attendedAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {/* Own activities (reused panel) */}
       <section aria-label="الأنشطة" className="space-y-2">
