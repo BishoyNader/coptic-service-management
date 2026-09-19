@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isAdminRole } from "@/lib/roles"
+import { isStaffRole } from "@/lib/roles"
 import { runBirthdayAutomation, type BirthdayAutomationResult } from "@/services/birthday-automation"
 
 export type RunBirthdayAutomationResult =
@@ -26,7 +26,7 @@ export async function runBirthdayAutomationAction(): Promise<RunBirthdayAutomati
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || !isAdminRole(profile.role)) {
+  if (!profile || !isStaffRole(profile.role)) {
     return { ok: false, message: "غير مصرح" }
   }
 

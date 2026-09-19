@@ -123,10 +123,10 @@ test.describe("PHASE 2 — E2E", () => {
     trackedPhones.push(phone)
     await registerMember(page, { phone, name: randomName("مخدوم") })
 
-    await page.goto("/app/admin")
+    await page.goto("/app/servant")
     await page.waitForURL(/\/login|\/app\/member/, { timeout: 10000 })
     const url = page.url()
-    expect(url.includes("/app/admin")).toBe(false)
+    expect(url.includes("/app/servant")).toBe(false)
   })
 
   test("15. Servant cannot access Admin routes", async ({ page }) => {
@@ -134,10 +134,10 @@ test.describe("PHASE 2 — E2E", () => {
     trackedPhones.push(phone)
     await registerServant(page, { phone, name: randomName("خادم") })
 
-    await page.goto("/app/admin")
+    await page.goto("/app/servant")
     await page.waitForURL(/\/login|\/app\/servant/, { timeout: 10000 })
     const url = page.url()
-    expect(url.includes("/app/admin")).toBe(false)
+    expect(url.includes("/app/servant")).toBe(false)
   })
 
   test("16. RLS prevents cross-user profile access", async ({ page }) => {

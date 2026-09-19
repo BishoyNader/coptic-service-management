@@ -152,7 +152,7 @@ export async function notifyUpcomingFeasts(): Promise<FeastNotificationResult> {
       title: feast.title,
       body: feast.body,
       // Broadcast to everyone in the application.
-      audiences: ["SERVED_MEMBER", "SERVANT", "ADMIN"],
+      audiences: ["SERVED_MEMBER", "SERVANT"],
     })
 
     if (result.ok) {

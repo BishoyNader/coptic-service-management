@@ -95,8 +95,6 @@ function roleSegment(role: string): string {
       return "member"
     case "SERVANT":
       return "servant"
-    case "ADMIN":
-      return "admin"
     case "SUPER_ADMIN":
       return "super-admin"
     default:

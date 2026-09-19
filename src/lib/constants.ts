@@ -20,24 +20,15 @@ export const MEMBER_NAV: NavItem[] = [
 
 export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant", label: "الرئيسية", icon: "home" },
-  { href: "/app/servant/attendance", label: "الحضور", icon: "scan" },
+  { href: "/app/servant/attendance", label: "تسجيل حضور", icon: "scan" },
+  { href: "/app/servant/members", label: "المخدومين", icon: "users" },
+  { href: "/app/servant/scores", label: "الدرجات", icon: "star" },
+  { href: "/app/servant/birthdays", label: "أعياد الميلاد", icon: "cake" },
+  { href: "/app/servant/reports", label: "التقارير", icon: "chart" },
   { href: "/app/servant/qr", label: "QR", icon: "qr" },
   { href: "/app/servant/activities", label: "الأنشطة", icon: "clipboard" },
-  { href: "/app/servant/members", label: "المخدومين", icon: "users" },
-  { href: "/app/servant/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/servant/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/servant/account", label: "حسابي", icon: "user" },
-];
-
-export const ADMIN_NAV: NavItem[] = [
-  { href: "/app/admin", label: "الرئيسية", icon: "home" },
-  { href: "/app/admin/attendance", label: "تسجيل حضور", icon: "scan" },
-  { href: "/app/admin/members", label: "المخدومين", icon: "users" },
-  { href: "/app/admin/scores", label: "الدرجات", icon: "star" },
-  { href: "/app/admin/notifications", label: "الإشعارات", icon: "bell" },
-  { href: "/app/admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
-  { href: "/app/admin/reports", label: "التقارير", icon: "chart" },
-  { href: "/app/admin/account", label: "حسابي", icon: "user" },
 ];
 
 export const SUPER_ADMIN_NAV: NavItem[] = [
@@ -77,8 +68,6 @@ export function navForRole(role: AppRole): NavItem[] {
       return MEMBER_NAV;
     case "SERVANT":
       return SERVANT_NAV;
-    case "ADMIN":
-      return ADMIN_NAV;
     case "SUPER_ADMIN":
       return SUPER_ADMIN_NAV;
   }
@@ -113,7 +102,6 @@ export type ScoringCategory = keyof typeof SCORING_CATEGORY_LABELS;
 export const NOTIFICATION_AUDIENCE_LABELS = {
   SERVED_MEMBER: "المخدومين",
   SERVANT: "الخدام",
-  ADMIN: "المسؤولين",
 } as const;
 
 export const ATTENDANCE_TYPE_LABELS = {

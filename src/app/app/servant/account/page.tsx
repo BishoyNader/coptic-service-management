@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES, ROLE_LABELS } from "@/lib/roles"
 import { ProfileForm } from "@/components/app/profile-form"
+import { PasswordChangeCard } from "@/components/app/password-change-card"
 import { updateProfileAction } from "@/app/actions/profile"
 
 export const metadata: Metadata = { title: "حسابي" }
@@ -13,22 +14,12 @@ export default async function ServantAccountPage() {
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SERVANT) redirect("/")
 
-  const { data: codes } = await supabase
-    .from("personal_codes")
-    .select("code")
-    .eq("profile_id", profile.id)
-    .maybeSingle()
-
   return (
-    <div className="mx-auto max-w-md">
-      <h1 className="mb-4 font-heading text-xl font-extrabold">حسابي</h1>
-      <ProfileForm
-        profile={profile}
-        role="servant"
-        personalCode={codes?.code}
-        onSubmit={updateProfileAction}
-      />
-      <p className="mt-4 text-center text-xs text-muted-foreground">
+    <div className="mx-auto max-w-md space-y-5">
+      <h1 className="font-heading text-xl font-extrabold">حسابي</h1>
+      <ProfileForm profile={profile} role="servant" onSubmit={updateProfileAction} />
+      <PasswordChangeCard />
+      <p className="text-center text-xs text-muted-foreground">
         نوع الحساب: {ROLE_LABELS[profile.role]}
       </p>
     </div>

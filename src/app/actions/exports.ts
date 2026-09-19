@@ -27,7 +27,7 @@ async function requireAdmin(): Promise<SupabaseServerClient | null> {
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || (profile.role !== ROLES.SUPER_ADMIN && profile.role !== ROLES.ADMIN)) return null
+  if (!profile || (profile.role !== ROLES.SUPER_ADMIN && profile.role !== ROLES.SERVANT)) return null
 
   // Per-admin CSV download budget (~12/h) so repeated exports cannot slam
   // the database or be abused by a compromised account.

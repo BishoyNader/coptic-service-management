@@ -130,7 +130,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {

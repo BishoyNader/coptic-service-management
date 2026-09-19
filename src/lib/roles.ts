@@ -1,12 +1,13 @@
 /**
  * Ordered set of application roles.
  * Public registration can only ever create SERVED_MEMBER or SERVANT.
- * ADMIN / SUPER_ADMIN accounts are created by authorized administrators.
+ * SERVANT is the staff/administrative role (it absorbed the former ADMIN
+ * role); SUPER_ADMIN is the only privileged role above it and can only be
+ * granted by another SUPER_ADMIN.
  */
 export const ROLES = {
   SERVED_MEMBER: "SERVED_MEMBER",
   SERVANT: "SERVANT",
-  ADMIN: "ADMIN",
   SUPER_ADMIN: "SUPER_ADMIN",
 } as const
 
@@ -15,7 +16,6 @@ export type AppRole = (typeof ROLES)[keyof typeof ROLES]
 export const ROLE_LABELS: Record<AppRole, string> = {
   SERVED_MEMBER: "مخدوم",
   SERVANT: "خادم",
-  ADMIN: "مسؤول خدمة",
   SUPER_ADMIN: "مسؤول عام",
 }
 
@@ -24,10 +24,14 @@ export const PUBLIC_REGISTRATION_ROLES: readonly AppRole[] = [
   ROLES.SERVANT,
 ]
 
-export const ADMIN_ROLES: readonly AppRole[] = [ROLES.ADMIN, ROLES.SUPER_ADMIN]
+/**
+ * Staff roles that carry administrative access. Servants are the operational
+ * staff; super-admins are the privileged staff above them.
+ */
+export const STAFF_ROLES: readonly AppRole[] = [ROLES.SERVANT, ROLES.SUPER_ADMIN]
 
-export function isAdminRole(role: AppRole | null | undefined): boolean {
-  return role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN
+export function isStaffRole(role: AppRole | null | undefined): boolean {
+  return role === ROLES.SERVANT || role === ROLES.SUPER_ADMIN
 }
 
 export function hasRole(
@@ -46,8 +50,6 @@ export function roleHomePath(role: AppRole): string {
       return "/app/member"
     case ROLES.SERVANT:
       return "/app/servant"
-    case ROLES.ADMIN:
-      return "/app/admin"
     case ROLES.SUPER_ADMIN:
       return "/app/super-admin"
   }

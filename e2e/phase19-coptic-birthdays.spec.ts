@@ -37,7 +37,7 @@ test.beforeAll(async () => {
   )
   actorId = userId
 
-  await createSeedAdmin(admin, "ADMIN", ADMIN_PHONE, ADMIN_PASSWORD)
+  await createSeedAdmin(admin, "SERVANT", ADMIN_PHONE, ADMIN_PASSWORD)
 })
 
 test.afterAll(async () => {
@@ -205,7 +205,7 @@ test.describe("Birthday visibility", () => {
 
   test("Admin birthday page shows served members", async ({ page }) => {
     await login(page, ADMIN_PHONE, ADMIN_PASSWORD)
-    await page.goto("/app/admin/birthdays")
+    await page.goto("/app/servant/birthdays")
 
     await expect(page.getByText("مارينا مخدومة", { exact: false })).toBeVisible({
       timeout: 15_000,
@@ -214,7 +214,7 @@ test.describe("Birthday visibility", () => {
 
   test("Admin birthday page shows servants", async ({ page }) => {
     await login(page, ADMIN_PHONE, ADMIN_PASSWORD)
-    await page.goto("/app/admin/birthdays")
+    await page.goto("/app/servant/birthdays")
 
     await expect(page.getByText("بسنتي خادم", { exact: false })).toBeVisible({
       timeout: 15_000,

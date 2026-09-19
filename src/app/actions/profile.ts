@@ -10,7 +10,7 @@ import {
 } from "@/services/admin-user-service"
 import {
   ROLES,
-  isAdminRole,
+  isStaffRole,
   type AppRole,
 } from "@/lib/roles"
 import { validateRegistration, isUuid } from "@/lib/validation"
@@ -54,7 +54,7 @@ export async function adminUpdateProfileAction(
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!adminProfile || !isAdminRole(adminProfile.role)) {
+  if (!adminProfile || !isStaffRole(adminProfile.role)) {
     return { ok: false, message: "غير مصرح" }
   }
 
@@ -100,7 +100,7 @@ export async function adminUpdateStatusAction(
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!adminProfile || !isAdminRole(adminProfile.role)) {
+  if (!adminProfile || !isStaffRole(adminProfile.role)) {
     return { ok: false, message: "غير مصرح" }
   }
 
@@ -174,9 +174,8 @@ export type AdminCreateUserActionResult =
   | { ok: false; field?: string; message: string }
 
 /**
- * Creates a SERVED_MEMBER / SERVANT account on behalf of an admin.
- * - ADMIN may only create SERVED_MEMBER.
- * - SUPER_ADMIN may create SERVED_MEMBER or SERVANT.
+ * Creates a SERVED_MEMBER / SERVANT account on behalf of staff.
+ * Staff (SERVANT / SUPER_ADMIN) may create both SERVED_MEMBER and SERVANT.
  * Uses the service-role client internally; the caller's identity is verified
  * first with the session client so RLS semantics for the actor are preserved.
  */
@@ -197,7 +196,7 @@ export async function adminCreateUserAction(
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!adminProfile || !isAdminRole(adminProfile.role)) {
+  if (!adminProfile || !isStaffRole(adminProfile.role)) {
     return { ok: false, message: "غير مصرح" }
   }
 
@@ -205,9 +204,7 @@ export async function adminCreateUserAction(
     return { ok: false, message: "نوع الحساب غير مسموح به" }
   }
 
-  if (adminProfile.role === ROLES.ADMIN && role !== ROLES.SERVED_MEMBER) {
-    return { ok: false, message: "مسؤول الخدمة يمكنه إضافة مخدومين فقط" }
-  }
+
 
   const validation = validateRegistration({
     role,

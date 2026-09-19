@@ -1,6 +1,6 @@
 import type { SupabaseAdminClient } from "@/lib/supabase/admin"
 import type { SupabaseServerClient } from "@/lib/supabase/server"
-import { isAdminRole, ROLES, type AppRole } from "@/lib/roles"
+import { isStaffRole, ROLES, type AppRole } from "@/lib/roles"
 import { cairoDateString } from "@/lib/cairo"
 import { daysBetweenDates, nextBirthdayDateString } from "@/lib/dates"
 import {
@@ -111,7 +111,7 @@ export async function sendBirthdayGreeting(
   admin: SupabaseAdminClient,
   input: SendBirthdayGreetingInput
 ): Promise<SendBirthdayGreetingResult> {
-  if (!isAdminRole(input.actorRole)) {
+  if (!isStaffRole(input.actorRole)) {
     return { ok: false, message: "غير مصرح", alreadySent: false }
   }
 

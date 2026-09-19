@@ -18,9 +18,8 @@ export const RECIPIENT_BATCH_SIZE = 500
  */
 const ALLOWED_AUDIENCES: Record<AppRole, readonly NotificationAudience[]> = {
   SERVED_MEMBER: [],
-  SERVANT: [],
-  ADMIN: ["SERVED_MEMBER", "SERVANT"],
-  SUPER_ADMIN: ["SERVED_MEMBER", "SERVANT", "ADMIN"],
+  SERVANT: ["SERVED_MEMBER", "SERVANT"],
+  SUPER_ADMIN: ["SERVED_MEMBER", "SERVANT"],
 }
 
 export function audienceRolesFor(actorRole: AppRole): readonly NotificationAudience[] {

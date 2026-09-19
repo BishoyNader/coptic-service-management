@@ -108,7 +108,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
@@ -176,7 +176,7 @@ function anonClient(): SupabaseClient {
       baseline[p.role as string] = (baseline[p.role as string] ?? 0) + 1
     }
 
-    adminSeed = await createAdmin(admin, "ADMIN", randomPhone(), "AdminSeed123!")
+    adminSeed = await createAdmin(admin, "SERVANT", randomPhone(), "AdminSeed123!")
     createdPhones.push(adminSeed.phoneRaw)
     superSeed = await createAdmin(admin, "SUPER_ADMIN", randomPhone(), "SuperSeed123!")
     createdPhones.push(superSeed.phoneRaw)
@@ -425,7 +425,7 @@ function anonClient(): SupabaseClient {
 
   test("75. Composer rejects a missing audience, title or body", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
     const submit = page.getByRole("button", { name: "إرسال الإشعار" })
 
     await submit.click()
@@ -446,7 +446,7 @@ function anonClient(): SupabaseClient {
 
   test("76. Admin composer offers only members & servants", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
     await expect(page.getByRole("checkbox", { name: "المخدومين" })).toBeVisible()
     await expect(page.getByRole("checkbox", { name: "الخدام" })).toBeVisible()
     await expect(page.getByRole("checkbox", { name: "المسؤولين" })).toHaveCount(0)
@@ -454,7 +454,7 @@ function anonClient(): SupabaseClient {
 
   test("77. Admin sends to members only and fans out to 2 recipients", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
     await page.getByRole("checkbox", { name: "المخدومين" }).click()
     await page.getByLabel("العنوان").fill(MEMBER_ONLY_TITLE)
     await page.getByLabel("الرسالة").fill("ميعاد اجتماع الخدمة الساعة ٧ مساءً")
@@ -505,7 +505,7 @@ function anonClient(): SupabaseClient {
 
   test("80. Fan-out across members & servants reaches 3 recipients", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
     await page.getByRole("checkbox", { name: "المخدومين" }).click()
     await page.getByRole("checkbox", { name: "الخدام" }).click()
     await page.getByLabel("العنوان").fill(FANOUT_TITLE)
@@ -524,10 +524,10 @@ function anonClient(): SupabaseClient {
   test("81. Admin cannot target the ADMINS audience (server-side)", async () => {
     const res = await createNotification(createAdminClient(), {
       actorId: adminSeed.userId,
-      actorRole: "ADMIN",
+      actorRole: "SERVANT",
       title: "غير مسموح",
       body: "يجب رفض هذا",
-      audiences: ["ADMIN"],
+      audiences: ["SERVANT"],
     })
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.message).toBe("غير مسموح بإرسال إشعار لهذا الجمهور")
@@ -664,7 +664,7 @@ function anonClient(): SupabaseClient {
 
   test("86. Admin sent-notifications list shows the sends", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
 
     await expect(page.getByText(MEMBER_ONLY_TITLE, { exact: true }).first()).toBeVisible()
     await expect(page.getByText(FANOUT_TITLE, { exact: true }).first()).toBeVisible()

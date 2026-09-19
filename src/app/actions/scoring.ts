@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isAdminRole } from "@/lib/roles"
+import { isStaffRole } from "@/lib/roles"
 import { isUuid } from "@/lib/validation"
 import {
   grantMonthlyActivity,
@@ -36,7 +36,7 @@ async function requireAdminActor(): Promise<{ adminId: string; role: string } | 
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || !isAdminRole(profile.role)) return null
+  if (!profile || !isStaffRole(profile.role)) return null
   return { adminId: user.id, role: profile.role }
 }
 

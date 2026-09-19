@@ -109,7 +109,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
@@ -213,7 +213,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test.beforeAll(async () => {
       admin = createAdminClient()
 
-      adminSeed = await createAdmin(admin, "ADMIN", randomPhone(), "AdminSeed123!")
+      adminSeed = await createAdmin(admin, "SERVANT", randomPhone(), "AdminSeed123!")
       createdPhones.push(adminSeed.phoneRaw)
       superSeed = await createAdmin(admin, "SUPER_ADMIN", randomPhone(), "SuperSeed123!")
       createdPhones.push(superSeed.phoneRaw)
@@ -230,20 +230,20 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("89. A member cannot access the admin birthdays page", async ({ page }) => {
       await login(page, memberBase.phone, memberBase.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(page).toHaveURL(/\/app\/member/, { timeout: 15_000 })
       await expect(page.getByText("أعياد الميلاد القادمة")).toHaveCount(0)
     })
 
     test("90. A servant cannot access the admin birthdays page", async ({ page }) => {
       await login(page, servantSeed.phone, servantSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15_000 })
       await expect(page.getByText("أعياد الميلاد القادمة")).toHaveCount(0)
     })
 
     test("91. Anonymous is sent to /login", async ({ page }) => {
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(page).toHaveURL(/\/login/, { timeout: 15_000 })
     })
 
@@ -251,7 +251,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
       page,
     }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(page.getByText("لا توجد أعياد قريبة")).toBeVisible()
       await expect(page.getByText("أعياد الميلاد اللي في خلال 30 يوم هتظهر هنا")).toBeVisible()
     })
@@ -300,7 +300,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("93. Today section highlights the member whose birthday is today", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       await expect(page.getByRole("heading", { name: "أعياد الميلاد القادمة" })).toBeVisible()
       await expect(page.getByText("اليوم", { exact: true })).toBeVisible()
@@ -311,7 +311,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("94. This-week section lists the member born this week", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       await expect(page.getByText("هذا الأسبوع", { exact: true })).toBeVisible()
       const weekRow = page.getByTestId("birthday-row").filter({ hasText: memberWeek.displayName! })
@@ -321,7 +321,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("95. The 30-day section lists the member born in 20 days", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       await expect(page.getByText("خلال 30 يومًا", { exact: true })).toBeVisible()
       const monthRow = page.getByTestId("birthday-row").filter({ hasText: memberMonth.displayName! })
@@ -333,7 +333,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
       page,
     }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       await expect(
         page.getByTestId("birthday-row").filter({ hasText: memberBoundary.displayName! })
@@ -345,7 +345,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("97. A member without a date of birth never appears", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(
         page.getByTestId("birthday-row").filter({ hasText: "مخدوم بدون عيد ميلاد" })
       ).toHaveCount(0)
@@ -353,7 +353,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("98. An INACTIVE member never appears", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(
         page.getByTestId("birthday-row").filter({ hasText: "مخدوم موقوف" })
       ).toHaveCount(0)
@@ -361,7 +361,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("99. A servant's birthday never appears in the admin list", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
       await expect(
         page.getByTestId("birthday-row").filter({ hasText: "خادم بعيد ميلاد" })
       ).toHaveCount(0)
@@ -371,7 +371,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
   test.describe("100-107 — Sending a birthday greeting", () => {
     test("100. The send dialog prefills the greeting with the member's name", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       const todayRow = page.getByTestId("birthday-row").filter({ hasText: memberToday.displayName! })
       await todayRow.getByRole("button", { name: "إرسال تهنئة" }).click()
@@ -390,7 +390,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("101. Cancel closes the dialog without sending", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       const weekRow = page.getByTestId("birthday-row").filter({ hasText: memberWeek.displayName! })
       await weekRow.getByRole("button", { name: "إرسال تهنئة" }).click()
@@ -409,7 +409,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("102. Empty title/body are rejected before sending", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       const weekRow = page.getByTestId("birthday-row").filter({ hasText: memberWeek.displayName! })
       await weekRow.getByRole("button", { name: "إرسال تهنئة" }).click()
@@ -431,7 +431,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
       page,
     }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       const todayRow = page.getByTestId("birthday-row").filter({ hasText: memberToday.displayName! })
       await todayRow.getByRole("button", { name: "إرسال تهنئة" }).click()
@@ -498,7 +498,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
     test("107. The UI shows the sent badge and hides the send button", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
-      await page.goto("/app/admin/birthdays")
+      await page.goto("/app/servant/birthdays")
 
       const todayRow = page.getByTestId("birthday-row").filter({ hasText: memberToday.displayName! })
       await expect(todayRow.getByText("✓ تم إرسال التهنئة")).toBeVisible()
@@ -510,7 +510,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test("108. A second send (admin, then super admin) is rejected as already sent", async () => {
       const first = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: memberToday.userId,
         title: GREETING_TITLE,
         body: "مكرر",
@@ -585,7 +585,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test("113. The service rejects a SERVANT as the target", async () => {
       const res = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: servantSeed.userId,
         title: GREETING_TITLE,
         body: "x",
@@ -597,7 +597,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test("114. The service rejects an INACTIVE member as the target", async () => {
       const res = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: memberInactive.userId,
         title: GREETING_TITLE,
         body: "x",
@@ -609,7 +609,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test("115. The service rejects a member without a date of birth", async () => {
       const res = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: memberBase.userId,
         title: GREETING_TITLE,
         body: "x",
@@ -643,7 +643,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test("117. The service rejects a birthday outside the 30-day window", async () => {
       const res = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: memberFar.userId,
         title: GREETING_TITLE,
         body: "x",
@@ -655,7 +655,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
     test("118. The service rejects empty title/body", async () => {
       const emptyTitle = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: memberWeek.userId,
         title: "   ",
         body: "نص",
@@ -665,7 +665,7 @@ test.describe("PHASE 5B — Birthday reminders", () => {
 
       const emptyBody = await sendBirthdayGreeting(createAdminClient(), {
         actorId: adminSeed.userId,
-        actorRole: "ADMIN",
+        actorRole: "SERVANT",
         targetProfileId: memberWeek.userId,
         title: GREETING_TITLE,
         body: "  ",

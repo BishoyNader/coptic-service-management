@@ -146,7 +146,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string,
   name = role === "SUPER_ADMIN" ? "أمين عام اختبار" : "أمين خدمة اختبار"
@@ -206,7 +206,7 @@ test.describe("PHASE 13 — Confirmed birthday product requirements", () => {
     admin = createAdminClient()
 
     superAdmin = await createAdmin(admin, "SUPER_ADMIN", randomPhone(), "Phase13SA1!", "أمين عام عيد")
-    adminUser = await createAdmin(admin, "ADMIN", randomPhone(), "Phase13AD1!", "أمين خدمة عيد")
+    adminUser = await createAdmin(admin, "SERVANT", randomPhone(), "Phase13AD1!", "أمين خدمة عيد")
     createdUserIds.push(superAdmin.userId, adminUser.userId)
     createdPhones.push(superAdmin.phoneRaw, adminUser.phoneRaw)
 
@@ -727,7 +727,7 @@ test.describe("PHASE 13 — Confirmed birthday product requirements", () => {
     expect(APP_NAME).toBe("خدمتي")
     expect(ROLE_LABELS[ROLES.SERVED_MEMBER]).toBe("مخدوم")
     expect(ROLE_LABELS[ROLES.SERVANT]).toBe("خادم")
-    expect(ROLE_LABELS[ROLES.ADMIN]).toBe("مسؤول خدمة")
+    expect(ROLE_LABELS[ROLES.SERVANT]).toBe("مسؤول خدمة")
     expect(ROLE_LABELS[ROLES.SUPER_ADMIN]).toBe("مسؤول عام")
   })
 })

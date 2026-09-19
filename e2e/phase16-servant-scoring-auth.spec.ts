@@ -71,7 +71,7 @@ let servantRoleActivityId = ""
 
 async function createUser(
   admin: SupabaseClient,
-  role: "SUPER_ADMIN" | "SERVANT" | "SERVED_MEMBER" | "ADMIN",
+  role: "SUPER_ADMIN" | "SERVANT" | "SERVED_MEMBER",
   phone: string,
   name: string,
   status = "ACTIVE"
@@ -134,7 +134,7 @@ test.beforeAll(async () => {
   member3 = await createUser(admin, "SERVED_MEMBER", MEMBER3_PHONE, "مخدوم التقييم 3")
   inactiveMember = await createUser(admin, "SERVED_MEMBER", INACTIVE_PHONE, "مخدوم موقوف", "INACTIVE")
   archivedMember = await createUser(admin, "SERVED_MEMBER", ARCHIVED_PHONE, "مخدوم مؤرشف", "ARCHIVED")
-  adminUser = await createUser(admin, "ADMIN", ADMIN_PHONE, "مسؤول الخدمة")
+  adminUser = await createUser(admin, "SERVANT", ADMIN_PHONE, "مسؤول الخدمة")
 
   // SERVED_MEMBER graded activity for the board
   const { data: memAct } = await admin

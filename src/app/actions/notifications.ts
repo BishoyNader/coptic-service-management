@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isAdminRole, type AppRole } from "@/lib/roles"
+import { isStaffRole, type AppRole } from "@/lib/roles"
 import {
   audienceRolesFor,
   createNotification,
@@ -30,7 +30,7 @@ async function requireAdminActor(): Promise<{ adminId: string; role: AppRole } |
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || !isAdminRole(profile.role)) return null
+  if (!profile || !isStaffRole(profile.role)) return null
 
   // Per-admin broadcast budget (~60/h) protects external-channel spend.
   const allowed = await consumeRateLimit(

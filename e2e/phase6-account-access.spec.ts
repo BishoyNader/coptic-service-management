@@ -74,7 +74,7 @@ async function seedEmailUser(
 async function createPrivilegedViaUI(
   page: Page,
   opts: {
-    role: "ADMIN" | "SUPER_ADMIN"
+    role: "SERVANT" | "SUPER_ADMIN"
     name: string
     phone: string
     email?: string
@@ -85,7 +85,7 @@ async function createPrivilegedViaUI(
   const dialog = page.getByRole("dialog")
   await expect(dialog).toBeVisible()
 
-  if (opts.role === "ADMIN") {
+  if (opts.role === "SERVANT") {
     await dialog.getByRole("button", { name: "مسؤول خدمة", exact: true }).click()
   } else {
     await dialog.getByRole("button", { name: "مسؤول عام", exact: true }).click()
@@ -139,7 +139,7 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
     await expect(page).toHaveURL(/\/app\/super-admin/, { timeout: 15000 })
     await page.goto("/app/super-admin/users")
 
-    await createPrivilegedViaUI(page, { role: "ADMIN", name, phone })
+    await createPrivilegedViaUI(page, { role: "SERVANT", name, phone })
 
     const dialog = page.getByRole("dialog")
     await expect(dialog.getByText("تمت إضافة مسؤول خدمة بنجاح")).toBeVisible({ timeout: 15000 })
@@ -162,7 +162,7 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
     await login(page, superSeed.phoneRaw, superSeed.password)
     await expect(page).toHaveURL(/\/app\/super-admin/, { timeout: 15000 })
     await page.goto("/app/super-admin/users")
-    await createPrivilegedViaUI(page, { role: "ADMIN", name, phone })
+    await createPrivilegedViaUI(page, { role: "SERVANT", name, phone })
     await expect(page.getByRole("dialog").getByText("تمت إضافة مسؤول خدمة بنجاح")).toBeVisible({
       timeout: 15000,
     })
@@ -170,21 +170,21 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
 
     await logout(page)
     await login(page, phone, PASSWORD)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
   })
 
   test("03. ADMIN cannot see 'إضافة مسؤول' nor reach super-admin pages", async ({ page }) => {
-    const adminSeed = await createSeedAdmin(admin, "ADMIN", randomPhone(), PASSWORD)
+    const adminSeed = await createSeedAdmin(admin, "SERVANT", randomPhone(), PASSWORD)
     track(adminSeed.phoneRaw)
 
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
 
-    await page.goto("/app/admin")
+    await page.goto("/app/servant")
     await expect(page.getByRole("button", { name: "إضافة مسؤول" })).toHaveCount(0)
 
     await page.goto("/app/super-admin/users")
-    await page.waitForURL(/\/login|\/app\/admin/, { timeout: 10000 })
+    await page.waitForURL(/\/login|\/app\/servant/, { timeout: 10000 })
     const url = page.url()
     expect(url.includes("/app/super-admin/users")).toBe(false)
   })
@@ -316,12 +316,12 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
   })
 
   test("08. Admin account page: self password change works (then reverts)", async ({ page }) => {
-    const adminSeed = await createSeedAdmin(admin, "ADMIN", randomPhone(), PASSWORD)
+    const adminSeed = await createSeedAdmin(admin, "SERVANT", randomPhone(), PASSWORD)
     track(adminSeed.phoneRaw)
 
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
-    await page.goto("/app/admin/account")
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
+    await page.goto("/app/servant/account")
 
     await expect(page.getByText("تغيير كلمة المرور").first()).toBeVisible()
 
@@ -333,10 +333,10 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
 
     await logout(page)
     await login(page, adminSeed.phoneRaw, "change1234")
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
 
     // Revert so the shared seed password stays stable for this session.
-    await page.goto("/app/admin/account")
+    await page.goto("/app/servant/account")
     await page.locator("#pc-current").fill("change1234")
     await page.locator("#pc-new").fill(PASSWORD)
     await page.locator("#pc-confirm").fill(PASSWORD)
@@ -387,7 +387,7 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
   })
 
   test("11. Dashboards show honest stats — no leftover placeholder text", async ({ page }) => {
-    const adminSeed = await createSeedAdmin(admin, "ADMIN", randomPhone(), PASSWORD)
+    const adminSeed = await createSeedAdmin(admin, "SERVANT", randomPhone(), PASSWORD)
     track(adminSeed.phoneRaw)
 
     await login(page, superSeed.phoneRaw, superSeed.password)
@@ -400,9 +400,9 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
 
     await logout(page)
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
 
-    await page.goto("/app/admin")
+    await page.goto("/app/servant")
     await expect(page.getByText("لوحة الخدمة اليومية")).toBeVisible()
     await expect(page.getByText("باقي الأقسام جاهزة للتفعيل")).toHaveCount(0)
     await expect(page.getByText("آخر نشاط").first()).toBeVisible()
@@ -416,24 +416,24 @@ test.describe("PHASE 6 — Account & Access Hardening", () => {
       await seedMember(admin, phone, "seedmember123")
     }
     track(...seeded)
-    const adminSeed = await createSeedAdmin(admin, "ADMIN", randomPhone(), PASSWORD)
+    const adminSeed = await createSeedAdmin(admin, "SERVANT", randomPhone(), PASSWORD)
     track(adminSeed.phoneRaw)
 
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
-    await page.goto("/app/admin/members")
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
+    await page.goto("/app/servant/members")
 
     await expect(page.getByText(/صفحة 1 من/)).toBeVisible()
     const next = page.getByRole("link", { name: /التالي/ })
     await expect(next).toBeVisible()
     await next.click()
-    await expect(page).toHaveURL(/\/app\/admin\/members\?page=2/)
+    await expect(page).toHaveURL(/\/app\/servant\/members\?page=2/)
     await expect(page.getByText(/صفحة 2 من/)).toBeVisible()
 
     const prev = page.getByRole("link", { name: /السابق/ })
     await expect(prev).toBeVisible()
     await prev.click()
-    await expect(page).toHaveURL(/\/app\/admin\/members$|page=1/)
+    await expect(page).toHaveURL(/\/app\/servant\/members$|page=1/)
     await expect(page.getByText(/صفحة 1 من/)).toBeVisible()
 
     await cleanupPhones(admin, seeded)

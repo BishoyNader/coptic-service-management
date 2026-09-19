@@ -126,12 +126,12 @@ export async function logout(page: Page) {
 
 export async function createSeedAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
   const normalized = normalizePhone(phone)
-  const displayName = role === "ADMIN" ? "إيكونوموس اختبار" : "رئيس شمامسة اختبار"
+  const displayName = role === "SERVANT" ? "إيكونوموس اختبار" : "رئيس شمامسة اختبار"
 
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     phone: normalized,

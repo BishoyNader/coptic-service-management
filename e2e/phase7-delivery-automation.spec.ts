@@ -105,7 +105,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
@@ -196,7 +196,7 @@ test.describe("PHASE 7 — Notification delivery & birthday automation", () => {
   test.beforeAll(async () => {
     admin = createAdminClient()
 
-    adminSeed = await createAdmin(admin, "ADMIN", randomPhone(), "AdminPhase7!")
+    adminSeed = await createAdmin(admin, "SERVANT", randomPhone(), "AdminPhase7!")
     createdPhones.push(adminSeed.phoneRaw)
     superSeed = await createAdmin(admin, "SUPER_ADMIN", randomPhone(), "SuperPhase7!")
     createdPhones.push(superSeed.phoneRaw)
@@ -574,7 +574,7 @@ test.describe("PHASE 7 — Notification delivery & birthday automation", () => {
 
   test("142. Admin birthday page shows automation button", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/birthdays")
+    await page.goto("/app/servant/birthdays")
     await expect(page.getByRole("button", { name: /تشغيل التهنئة التلقائية/ })).toBeVisible()
   })
 
@@ -590,7 +590,7 @@ test.describe("PHASE 7 — Notification delivery & birthday automation", () => {
 
   test("144. Composer shows channel selection when external channels are available", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
 
     // The channel selection section may or may not be visible depending on env config
     // Just verify the composer works and is accessible
@@ -635,7 +635,7 @@ test.describe("PHASE 7 — Notification delivery & birthday automation", () => {
 
   test("148. Existing in-app notification flow still works", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/notifications")
+    await page.goto("/app/servant/notifications")
 
     await page.getByRole("checkbox", { name: "المخدومين" }).click()
     await page.getByLabel("العنوان").fill("إشعار اختبار_regression")

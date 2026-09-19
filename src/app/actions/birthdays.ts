@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isAdminRole, type AppRole } from "@/lib/roles"
+import { isStaffRole, type AppRole } from "@/lib/roles"
 import {
   sendBirthdayGreeting,
   type SendBirthdayGreetingResult,
@@ -30,7 +30,7 @@ export async function sendBirthdayGreetingAction(input: {
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || !isAdminRole(profile.role)) {
+  if (!profile || !isStaffRole(profile.role)) {
     return { ok: false, message: "غير مصرح", alreadySent: false }
   }
 

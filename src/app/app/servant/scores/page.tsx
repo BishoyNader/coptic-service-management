@@ -9,10 +9,10 @@ import { EmptyState } from "@/components/coptic/empty-state"
 
 export const metadata: Metadata = { title: "الدرجات" }
 
-export default async function AdminScoresPage() {
+export default async function ServantScoresPage() {
   const supabase = await createClient()
   const profile = await getProfile(supabase)
-  if (!profile || profile.role !== ROLES.ADMIN) redirect("/")
+  if (!profile || profile.role !== ROLES.SERVANT) redirect("/")
 
   const members = await listScorableMembers(supabase)
 

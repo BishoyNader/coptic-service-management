@@ -134,7 +134,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
@@ -273,7 +273,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
     const phones = [randomPhone(), randomPhone(), randomPhone(), randomPhone(), randomPhone()]
     createdPhones.push(...phones)
     const [a, sa, m, m2, s] = await Promise.all([
-      createAdmin(admin, "ADMIN", phones[0], "adminpass123"),
+      createAdmin(admin, "SERVANT", phones[0], "adminpass123"),
       createAdmin(admin, "SUPER_ADMIN", phones[1], "adminpass123"),
       createUser(admin, "SERVED_MEMBER", phones[2], "testpass123", "مخدوم سكور أ"),
       createUser(admin, "SERVED_MEMBER", phones[3], "testpass123", "مخدوم سكور ب"),
@@ -337,7 +337,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 42. Member views the weekly breakdown an admin entered.
   test("42. Admin enters a commitment and the member sees the weekly score", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("radio", { name: "الالتزام 3", exact: true }).click()
     await saveScoring(page)
     await expect
@@ -360,7 +360,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 43. Monthly activity shows up on the MONTH tab only (never the weekly one).
   test("43. Monthly activity appears in the monthly view and is excluded from weekly", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("button", { name: /تسجيل نشاط شهري/ }).click()
     await expect(page.getByText("تم تسجيل النشاط الشهري")).toBeVisible({ timeout: 15_000 })
 
@@ -377,7 +377,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 44. Admin fast entry: commitment values persist (0–10).
   test("44. Admin sets a commitment of 7 for the week", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("radio", { name: "الالتزام 7", exact: true }).click()
     await saveScoring(page)
     await expect
@@ -412,7 +412,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
     expect(negative.ok).toBe(false)
 
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await expect(
       page.getByRole("radiogroup", { name: "الالتزام", exact: true }).getByRole("radio")
     ).toHaveCount(11)
@@ -421,7 +421,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 46. Tunic checkbox grants the exact configured value (5).
   test("46. Admin checks tunic and it persists the configured value", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("checkbox", { name: "لبس التونية" }).check()
     await saveScoring(page)
     await expect
@@ -462,7 +462,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 48. Communion checkbox persists its configured value.
   test("48. Admin checks communion and it persists the configured value", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("checkbox", { name: "التناول" }).check()
     await saveScoring(page)
     await expect
@@ -492,7 +492,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 50. Service commitment picker persists its 0–10 value.
   test("50. Admin sets service commitment of 5", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("radio", { name: "التزام الخدمة 5", exact: true }).click()
     await saveScoring(page)
     await expect
@@ -522,7 +522,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 52. Bonus checkbox persists its configured value (3).
   test("52. Admin checks the bonus and it persists the configured value", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("checkbox", { name: "Bonus ⭐" }).check()
     await saveScoring(page)
     await expect
@@ -542,7 +542,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
     await seedAttendance("SERVICE", member.userId)
 
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     const churchCard = page.locator("div").filter({ hasText: /حضور القداس \(تلقائي\)\s*\+10/ }).first()
     await expect(churchCard).toBeVisible()
     const serviceCard = page.locator("div").filter({ hasText: /حضور الخدمة \(تلقائي\)\s*\+10/ }).first()
@@ -552,7 +552,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 54. Attendance is never a manual input — a save cannot change it.
   test("54. Attendance cannot be edited by an admin", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await expect(page.getByRole("spinbutton")).toHaveCount(0)
     await saveScoring(page)
 
@@ -570,7 +570,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 55. Weekly total = attendance + commitment cards only (activity excluded).
   test("55. Weekly total is the sum of the weekly categories", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await expect(page.getByText("45 نقطة")).toBeVisible()
 
     await logout(page)
@@ -656,7 +656,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
 
     await logout(page)
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/scores")
+    await page.goto("/app/servant/scores")
     const options = await page.getByLabel("اختار المخدوم").locator("option").allTextContents()
     expect(options).toContain(member.displayName)
     expect(options).not.toContain(servant.displayName)
@@ -675,7 +675,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 61. Admins can correct a weekly score (7 → 8); every change is audited.
   test("61. Admin corrects a weekly score and the change is audited", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await openScoring(page, "/app/admin/scores", member.displayName)
+    await openScoring(page, "/app/servant/scores", member.displayName)
     await page.getByRole("radio", { name: "الالتزام 8", exact: true }).click()
     await saveScoring(page)
 

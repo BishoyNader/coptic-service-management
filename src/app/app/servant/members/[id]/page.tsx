@@ -10,7 +10,7 @@ import { adminUpdateProfileAction, adminUpdateStatusAction } from "@/app/actions
 
 export const metadata: Metadata = { title: "عرض عضو" }
 
-export default async function AdminMemberDetailPage({
+export default async function ServantMemberDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -18,7 +18,7 @@ export default async function AdminMemberDetailPage({
   const { id } = await params
   const supabase = await createClient()
   const session = await getProfile(supabase)
-  if (!session || (session.role !== ROLES.ADMIN && session.role !== ROLES.SUPER_ADMIN)) {
+  if (!session || (session.role !== ROLES.SERVANT && session.role !== ROLES.SUPER_ADMIN)) {
     redirect("/")
   }
 
@@ -61,7 +61,7 @@ export default async function AdminMemberDetailPage({
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <Link
-        href={`/app/${session.role === ROLES.ADMIN ? "admin" : "super-admin"}/members`}
+        href="/app/servant/members"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowRight className="size-4" />

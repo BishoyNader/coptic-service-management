@@ -6,7 +6,6 @@ import {
   Search,
   User,
   HeartHandshake,
-  Shield,
   ShieldCheck,
   ChevronLeft,
   Power,
@@ -127,8 +126,6 @@ export function UsersList({
         return <User className="size-4" />
       case "SERVANT":
         return <HeartHandshake className="size-4" />
-      case "ADMIN":
-        return <Shield className="size-4" />
       case "SUPER_ADMIN":
         return <ShieldCheck className="size-4" />
     }
@@ -140,8 +137,6 @@ export function UsersList({
         return "bg-coptic-gold-soft text-coptic-gold"
       case "SERVANT":
         return "bg-coptic-teal/10 text-coptic-teal"
-      case "ADMIN":
-        return "bg-coptic-navy/10 text-coptic-navy"
       case "SUPER_ADMIN":
         return "bg-coptic-terra/10 text-coptic-terra"
     }
@@ -178,7 +173,6 @@ export function UsersList({
     { key: "ALL", label: "الكل" },
     { key: "SERVED_MEMBER", label: "مخدوم" },
     { key: "SERVANT", label: "خادم" },
-    { key: "ADMIN", label: "مسؤول" },
     { key: "SUPER_ADMIN", label: "مسؤول عام" },
   ]
 

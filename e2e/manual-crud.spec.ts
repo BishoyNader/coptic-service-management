@@ -37,7 +37,7 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
 
   test.beforeAll(async () => {
     admin = createSupabaseAdmin()
-    adminSeed = await createSeedAdmin(admin, "ADMIN", randomPhone(), "testadmin123")
+    adminSeed = await createSeedAdmin(admin, "SERVANT", randomPhone(), "testadmin123")
     superSeed = await createSeedAdmin(admin, "SUPER_ADMIN", randomPhone(), "testadmin123")
   })
 
@@ -55,8 +55,8 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
     createdPhones.push(phone)
 
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
-    await page.goto("/app/admin/members")
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
+    await page.goto("/app/servant/members")
 
     await openAddAndFill(page, "+ إضافة مخدوم", { name, phone })
 
@@ -79,8 +79,8 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
     page,
   }) => {
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
-    await page.goto("/app/admin/members")
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
+    await page.goto("/app/servant/members")
 
     await page.getByRole("button", { name: "+ إضافة مخدوم" }).first().click()
     await expect(page.getByRole("dialog")).toBeVisible()
@@ -93,8 +93,8 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
     createdPhones.push(phone)
 
     await login(page, adminSeed.phoneRaw, adminSeed.password)
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15000 })
-    await page.goto("/app/admin/members")
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15000 })
+    await page.goto("/app/servant/members")
     await openAddAndFill(page, "+ إضافة مخدوم", { name, phone })
     await expect(page.getByText("تمت إضافة مخدوم بنجاح")).toBeVisible({ timeout: 15000 })
     await page.getByRole("button", { name: "إغلاق" }).click()

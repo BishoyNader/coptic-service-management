@@ -79,7 +79,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
@@ -122,7 +122,7 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
   test.beforeAll(async () => {
     admin = createAdminClient()
 
-    adminSeed = await createAdmin(admin, "ADMIN", randomPhone(), "AdminPhase8!")
+    adminSeed = await createAdmin(admin, "SERVANT", randomPhone(), "AdminPhase8!")
     createdPhones.push(adminSeed.phoneRaw)
     superSeed = await createAdmin(admin, "SUPER_ADMIN", randomPhone(), "SuperPhase8!")
     createdPhones.push(superSeed.phoneRaw)
@@ -204,15 +204,15 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
 
   test("151. Admin members list loads the first page with bounded rows", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/members")
+    await page.goto("/app/servant/members")
     await expect(page.getByRole("heading", { name: "المخدومين" })).toBeVisible()
-    const rows = page.locator('a[href^="/app/admin/members/"]')
+    const rows = page.locator('a[href^="/app/servant/members/"]')
     expect(await rows.count()).toBeLessThanOrEqual(LIST_PAGE_SIZE)
   })
 
   test("152. Admin members search filters server-side and keeps a bounded page", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/members?q=" + encodeURIComponent("بحث ترتيبي"))
+    await page.goto("/app/servant/members?q=" + encodeURIComponent("بحث ترتيبي"))
     await expect(page.getByText("بحث ترتيبي واحد")).toBeVisible()
     await expect(page.getByText("مخدوم العمليات")).toHaveCount(0)
     await expect(page.locator('input[name="q"]')).toHaveValue("بحث ترتيبي")
@@ -220,7 +220,7 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
 
   test("153. Admin members empty state shows for a non-matching search", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/members?q=" + encodeURIComponent("اسم غير موجود تماما"))
+    await page.goto("/app/servant/members?q=" + encodeURIComponent("اسم غير موجود تماما"))
     await expect(page.getByText("لا توجد نتائج")).toBeVisible()
   })
 
@@ -277,7 +277,7 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
 
   test("157. ADMIN can open the admin reports page", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/reports")
+    await page.goto("/app/servant/reports")
     await expect(page.getByRole("heading", { name: "التقارير" })).toBeVisible()
     await expect(page.getByRole("tab")).toHaveCount(3)
   })
@@ -285,19 +285,19 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
   test("158. ADMIN reports are not accessible from super-admin URLs", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
     await page.goto("/app/super-admin/reports")
-    await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15_000 })
+    await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15_000 })
     await expect(page.getByRole("heading", { name: "التقارير" })).toHaveCount(0)
   })
 
   test("159. SERVED_MEMBER cannot open admin reports", async ({ page }) => {
     await login(page, memberBase.phone, memberBase.password)
-    await page.goto("/app/admin/reports")
+    await page.goto("/app/servant/reports")
     await expect(page).toHaveURL(/\/app\/member/, { timeout: 15_000 })
   })
 
   test("160. SERVANT cannot open admin reports", async ({ page }) => {
     await login(page, servantSeed.phone, servantSeed.password)
-    await page.goto("/app/admin/reports")
+    await page.goto("/app/servant/reports")
     await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15_000 })
   })
 
@@ -307,7 +307,7 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
 
   test("161. Admin exports the members CSV with columns and no auth secrets", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/members")
+    await page.goto("/app/servant/members")
 
     const downloadPromise = page.waitForEvent("download")
     await page.getByRole("button", { name: /تصدير CSV/ }).first().click()
@@ -377,9 +377,9 @@ test.describe("PHASE 8 — Scale, reporting & data operations", () => {
 
   test("165. A page query with no search never over-renders", async ({ page }) => {
     await login(page, adminSeed.phone, adminSeed.password)
-    await page.goto("/app/admin/members?page=2&q=")
+    await page.goto("/app/servant/members?page=2&q=")
     await expect(page.getByRole("heading", { name: "المخدومين" })).toBeVisible()
-    const rows = page.locator('a[href^="/app/admin/members/"]')
+    const rows = page.locator('a[href^="/app/servant/members/"]')
     expect(await rows.count()).toBeLessThanOrEqual(LIST_PAGE_SIZE)
   })
 })

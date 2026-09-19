@@ -16,20 +16,18 @@ Coptic Orthodox Church service management web app. Arabic-first, RTL, mobile-fir
 | Role | Segments | Home |
 | --- | --- | --- |
 | `SERVED_MEMBER` | `/app/member/*` | member dashboard + personal QR |
-| `SERVANT` | `/app/servant/*` | servant dashboard + check-in |
-| `ADMIN` | `/app/admin/*` | attendance, scoring, members, birthdays, notifications |
+| `SERVANT` | `/app/servant/*` | servant dashboard + check-in, attendance, scoring, members, birthdays, reports, notifications |
 | `SUPER_ADMIN` | `/app/super-admin/*` | everything above + users, servants, audit log, reports, settings |
 
-Public registration is limited to served members and servants via `/register/member` and `/register/servant`. ADMIN and SUPER_ADMIN accounts are only provisioned by another super-admin (the privileged-user dialog) — never via public registration.
+Public registration is limited to served members and servants via `/register/member` and `/register/servant`. SUPER_ADMIN accounts are only provisioned by another super-admin (the privileged-user dialog) — never via public registration.
 
 Full route map (from `npm run build`):
 
 ```
 /auth/callback, /login, /register(/member|/servant), /forgot-password, /reset-password
-/app/{member,servant,admin,super-admin}/{,account,notifications}
-/app/servant/{qr,activities,attendance}
+/app/{member,servant,super-admin}/{,account,notifications}
+/app/servant/{qr,activities,attendance,scores,birthdays,members,members/[id],reports}
 /app/member/{qr,scores}
-/app/admin/{members,members/[id],attendance,scores,birthdays,notifications}
 /app/super-admin/{users,user/[id],members,servants,attendance,scores,birthdays,audit-log,reports,settings,notifications}
 /api/auth/{register,set-session}
 /api/cron/birthdays
@@ -47,12 +45,12 @@ Full route map (from `npm run build`):
 
 ## Access & account hardening (Phase 6)
 
-- **Privileged provisioning only** — `Super Admin → Users → إضافة حساب ذو صلاحية`: creates an ADMIN/SUPER_ADMIN auth user + profile + audit entry in a single server-side operation (never trusts a browser role/user id, never weakens RLS).
+- **Privileged provisioning only** — `Super Admin → Users → إضافة حساب ذو صلاحية`: creates a SUPER_ADMIN auth user + profile + audit entry in a single server-side operation (never trusts a browser role/user id, never weakens RLS).
 - **RLS hardening** — triggers on `profiles` raise `42501` whenever a user edits their own `role`/`status` (or other protected fields) while the server-side privileged operations run under the service role, keeping admission/attendance boundaries live.
 - **Auditing** — every privileged action writes `audit_logs`; the actor identity comes from the verified auth session, never from request payloads. Passwords are never logged or stored in plaintext.
 - **Password recovery (designed)** — email-only self-recovery; forgot-password returns one generic message for both email and phone (no account enumeration). The recovery link lands on `/auth/callback` (tokens arrive in the URL fragment, which server routes cannot read), the browser client posts them to `/api/auth/set-session`, and the user is taken to `/reset-password`. Admin-initiated reset (`admin.auth.admin.updateUserById`) is the universal path for phone-only accounts.
 - **Route protection** — `src/proxy.ts` enforces login and role segments; public prefixes are `/login`, `/register`, `/forgot-password`, `/reset-password`, `/auth/callback`. Authenticated users visiting the recovery pages are allowed through so a fresh recovery session can finish.
-- **Honest dashboards** — admin/super-admin homes show real aggregates (active members, today's attendance, upcoming birthdays, latest activity) and empty-state messages; no placeholder copy.
+- **Honest dashboards** — super-admin home shows real aggregates (active members, today's attendance, upcoming birthdays, latest activity) and empty-state messages; no placeholder copy.
 
 ## Notification delivery & birthday automation (Phase 7)
 

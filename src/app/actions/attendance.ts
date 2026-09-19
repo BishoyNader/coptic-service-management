@@ -48,9 +48,7 @@ async function requireAttendanceActor(): Promise<{ actorId: string; role: string
 
   if (
     !profile ||
-    (profile.role !== ROLES.SERVANT &&
-      profile.role !== ROLES.ADMIN &&
-      profile.role !== ROLES.SUPER_ADMIN)
+    (profile.role !== ROLES.SERVANT && profile.role !== ROLES.SUPER_ADMIN)
   ) {
     return null
   }

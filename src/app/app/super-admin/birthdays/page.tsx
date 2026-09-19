@@ -17,7 +17,6 @@ export default async function SuperAdminBirthdaysPage() {
   const rows = await getUpcomingBirthdays(supabase, [
     ROLES.SERVED_MEMBER,
     ROLES.SERVANT,
-    ROLES.ADMIN,
     ROLES.SUPER_ADMIN,
   ])
 

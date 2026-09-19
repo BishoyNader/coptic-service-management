@@ -115,7 +115,7 @@ async function createUser(
 
 async function createAdmin(
   admin: SupabaseClient,
-  role: "ADMIN" | "SUPER_ADMIN",
+  role: "SERVANT" | "SUPER_ADMIN",
   phone: string,
   password: string
 ) {
@@ -167,7 +167,7 @@ test.describe("PHASE 5C — Reports & Settings", () => {
   test.beforeAll(async () => {
     admin = createAdminClient()
 
-    adminSeed = await createAdmin(admin, "ADMIN", randomPhone(), "AdminSeed123!")
+    adminSeed = await createAdmin(admin, "SERVANT", randomPhone(), "AdminSeed123!")
     createdPhones.push(adminSeed.phoneRaw)
     superSeed = await createAdmin(admin, "SUPER_ADMIN", randomPhone(), "SuperSeed123!")
     createdPhones.push(superSeed.phoneRaw)
@@ -236,9 +236,9 @@ test.describe("PHASE 5C — Reports & Settings", () => {
     test("126. An ADMIN cannot open super-admin reports or settings", async ({ page }) => {
       await login(page, adminSeed.phone, adminSeed.password)
       await page.goto("/app/super-admin/reports")
-      await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15_000 })
+      await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15_000 })
       await page.goto("/app/super-admin/settings")
-      await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15_000 })
+      await expect(page).toHaveURL(/\/app\/servant/, { timeout: 15_000 })
     })
 
     test("127. Super Admin opens reports (3 tabs) and settings (rules + add button)", async ({

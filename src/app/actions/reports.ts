@@ -14,7 +14,7 @@ import {
 } from "@/services/reports-service"
 
 /**
- * Reports are accessible to ADMIN and SUPER_ADMIN.
+ * Reports are accessible to SERVANT and SUPER_ADMIN.
  * The actor is re-verified inside every action from the session (never from
  * anything the browser forwards); reports read through the authenticated
  * client so RLS still applies.
@@ -32,7 +32,7 @@ async function requireAdmin(): Promise<{ supabase: SupabaseServerClient; actorId
     .eq("id", user.id)
     .maybeSingle()
 
-  if (!profile || (profile.role !== ROLES.SUPER_ADMIN && profile.role !== ROLES.ADMIN)) return null
+  if (!profile || (profile.role !== ROLES.SUPER_ADMIN && profile.role !== ROLES.SERVANT)) return null
   return { supabase, actorId: user.id }
 }
 

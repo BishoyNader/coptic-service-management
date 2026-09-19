@@ -7,10 +7,10 @@ import { ReportsView } from "@/components/app/reports-view"
 
 export const metadata: Metadata = { title: "التقارير" }
 
-export default async function AdminReportsPage() {
+export default async function ServantReportsPage() {
   const supabase = await createClient()
   const profile = await getProfile(supabase)
-  if (!profile || profile.role !== ROLES.ADMIN) redirect("/")
+  if (!profile || profile.role !== ROLES.SERVANT) redirect("/")
 
   return (
     <div className="space-y-4">

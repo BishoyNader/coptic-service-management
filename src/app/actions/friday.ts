@@ -84,7 +84,7 @@ export type FridayGridResult =
  * score.
  */
 export async function getFridayAttendanceGridAction(date: string): Promise<FridayGridResult> {
-  const actor = await requireRoles([ROLES.SERVANT, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  const actor = await requireRoles([ROLES.SERVANT, ROLES.SUPER_ADMIN])
   if (!actor) return { ok: false, message: "غير مصرح" }
   const admin = createAdminClient()
   const parsed = await validateFridayDate(admin, date)
@@ -106,7 +106,7 @@ export type FridayMinistryResult =
  * (no ownership restriction) just like admins.
  */
 export async function getFridayMinistryDataAction(date: string): Promise<FridayMinistryResult> {
-  const actor = await requireRoles([ROLES.SERVANT, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  const actor = await requireRoles([ROLES.SERVANT, ROLES.SUPER_ADMIN])
   if (!actor) return { ok: false, message: "غير مصرح" }
   const admin = createAdminClient()
   const parsed = await validateFridayDate(admin, date)

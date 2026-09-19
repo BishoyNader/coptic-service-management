@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Loader2, Shield, ShieldCheck } from "lucide-react"
+import { Check, Loader2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import {
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { adminCreatePrivilegedUserAction } from "@/app/actions/account"
 import { ROLE_LABELS, ROLES, type AppRole } from "@/lib/roles"
 
-type PrivilegedRole = Extract<AppRole, "ADMIN" | "SUPER_ADMIN">
+type PrivilegedRole = Extract<AppRole, "SUPER_ADMIN">
 
 type FieldErrors = {
   fullName?: string
@@ -45,7 +45,7 @@ const newFieldErrors = (): FieldErrors => ({})
 export function PrivilegedUserForm({
   open,
   onOpenChange,
-  defaultRole = ROLES.ADMIN,
+  defaultRole = ROLES.SUPER_ADMIN,
 }: PrivilegedUserFormProps) {
   const router = useRouter()
   const [role, setRole] = useState<PrivilegedRole>(defaultRole)
@@ -187,19 +187,6 @@ export function PrivilegedUserForm({
             <div className="space-y-2">
               <Label>صلاحية الحساب</Label>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole(ROLES.ADMIN)}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-semibold transition-colors",
-                    role === ROLES.ADMIN
-                      ? "border-2 border-coptic-navy bg-coptic-navy/10 text-coptic-navy"
-                      : "border border-border bg-card text-muted-foreground"
-                  )}
-                >
-                  <Shield className="size-4" />
-                  {ROLE_LABELS.ADMIN}
-                </button>
                 <button
                   type="button"
                   onClick={() => setRole(ROLES.SUPER_ADMIN)}

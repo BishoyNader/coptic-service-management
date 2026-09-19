@@ -8,12 +8,12 @@ import { ROLES, type AppRole } from "@/lib/roles"
  * These accounts never receive a personal code/QR — they are staff, not
  * served members, and their check-in presence is not scored.
  */
-export const PRIVILEGED_ROLES = [ROLES.ADMIN, ROLES.SUPER_ADMIN] as const
+export const PRIVILEGED_ROLES = [ROLES.SUPER_ADMIN] as const
 
 export type PrivilegedRole = (typeof PRIVILEGED_ROLES)[number]
 
 export function isPrivilegedRole(role: AppRole | null | undefined): role is PrivilegedRole {
-  return role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN
+  return role === ROLES.SUPER_ADMIN
 }
 
 export type AdminCreatePrivilegedInput = {
