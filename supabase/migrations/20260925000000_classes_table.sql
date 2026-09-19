@@ -17,12 +17,12 @@ alter table public.classes enable row level security;
 
 create policy "classes_super_admin_all"
   on public.classes for all
-  using (public.is_super_admin())
-  with check (public.is_super_admin());
+  using (public.current_role() = 'SUPER_ADMIN')
+  with check (public.current_role() = 'SUPER_ADMIN');
 
 create policy "classes_staff_read"
   on public.classes for select
-  using (public.is_staff());
+  using (public.is_admin());
 
 -- Now migrate existing free-text class values into the classes table.
 -- Insert distinct non-empty class values that don't already exist.
