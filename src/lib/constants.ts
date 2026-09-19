@@ -41,16 +41,11 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/super-admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/super-admin/activities", label: "الأنشطة", icon: "clipboard" },
-  { href: "/app/super-admin/record-activities", label: "تسجيل الأنشطة", icon: "activity" },
+  { href: "/app/super-admin/record-activities", label: "نشاط الخدام", icon: "activity" },
   { href: "/app/super-admin/reports", label: "التقارير", icon: "chart" },
   {
     href: "/app/super-admin/study-years",
     label: "أعوام الخدمة",
-    icon: "calendar",
-  },
-  {
-    href: "/app/super-admin/coptic-calendar",
-    label: "التقويم القبطي",
     icon: "calendar",
   },
   { href: "/app/super-admin/users", label: "المستخدمين", icon: "shield" },

@@ -10,7 +10,7 @@ import { getServantDayData } from "@/services/servant-day-service"
 import { getScoringBoardData } from "@/services/member-scoring-service"
 import { ServantActivitiesHub, type HubServant } from "@/components/app/servant-activities-hub"
 
-export const metadata: Metadata = { title: "تسجيل الأنشطة" }
+export const metadata: Metadata = { title: "نشاط الخدام" }
 
 const SELF_HISTORY_DAYS = 14
 const MIN_DATE_DAYS = 90
@@ -53,9 +53,9 @@ export default async function SuperAdminRecordActivitiesPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="font-heading text-xl font-extrabold">تسجيل الأنشطة</h1>
+        <h1 className="font-heading text-xl font-extrabold">نشاط الخدام</h1>
         <p className="text-sm text-muted-foreground">
-          سجّل أنشطة وحضور الخدام — كل حاجة في مكان واحد
+          سجّل أنشطة الخدام ودرجات المخدومين من مكان واحد
         </p>
       </div>
 

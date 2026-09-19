@@ -6,6 +6,7 @@ import { CalendarPlus, Save, Star, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import { lastFridayOnOrBefore } from "@/lib/friday"
 import {
   getScoreEntryViewAction,
   grantMonthlyActivityAction,
@@ -32,7 +33,7 @@ export function ScoringEntry({
 }) {
   const router = useRouter()
   const [memberId, setMemberId] = useState("")
-  const [weekDate, setWeekDate] = useState(cairoToday())
+  const [weekDate, setWeekDate] = useState(() => lastFridayOnOrBefore(cairoToday()))
   const [state, setState] = useState<WeeklyEntryState | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -160,9 +161,12 @@ export function ScoringEntry({
             aria-label="أسبوع"
             type="date"
             value={weekDate}
-            onChange={(e) => setWeekDate(e.target.value)}
+            onChange={(e) => setWeekDate(lastFridayOnOrBefore(e.target.value || cairoToday()))}
             className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
           />
+          <p className="text-[11px] text-muted-foreground">
+            يُسجَّل يوم الجمعة فقط — أي تاريخ يُحوَّل إلى أقرب جمعة
+          </p>
         </div>
       </div>
 
