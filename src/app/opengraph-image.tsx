@@ -96,7 +96,7 @@ export default function Image() {
             textAlign: "center",
           }}
         >
-          كنيسة السيدة العذراء وأي حوف
+          كنيسة السيدة العذراء - وادي حوف
         </div>
 
         {/* Subtitle */}

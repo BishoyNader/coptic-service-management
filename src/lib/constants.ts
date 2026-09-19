@@ -1,7 +1,7 @@
 import type { AppRole } from "./roles";
 
 export const APP_NAME = "خدمتي";
-export const APP_TAGLINE = "كنيسة السيدة العذراء وأي حوف";
+export const APP_TAGLINE = "كنيسة السيدة العذراء - وادي حوف";
 
 /** App navigation configuration per role. */
 export type NavItem = {
