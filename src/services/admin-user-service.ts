@@ -12,6 +12,7 @@ export type AdminCreateUserInput = {
   address?: string
   fatherPhone?: string
   motherPhone?: string
+  class?: string
 }
 
 export type AdminCreateUserResult =
@@ -37,7 +38,7 @@ export async function createAdminUser(
   actorId: string,
   input: AdminCreateUserInput
 ): Promise<AdminCreateUserResult> {
-  const { role, fullName, phone, password, dateOfBirth, address, fatherPhone, motherPhone } = input
+  const { role, fullName, phone, password, dateOfBirth, address, fatherPhone, motherPhone, class: memberClass } = input
   const normalizedPhone = normalizePhone(phone)
 
   const existing = await admin
@@ -89,7 +90,11 @@ export async function createAdminUser(
   }
 
   const detailTable = role === "SERVED_MEMBER" ? "served_members" : "servants"
-  const { error: detailError } = await admin.from(detailTable).insert({ profile_id: userId })
+  const detailRow: Record<string, unknown> = { profile_id: userId }
+  if (role === "SERVED_MEMBER" && memberClass) {
+    detailRow.class = memberClass
+  }
+  const { error: detailError } = await admin.from(detailTable).insert(detailRow)
 
   if (detailError) {
     await admin.auth.admin.deleteUser(userId)

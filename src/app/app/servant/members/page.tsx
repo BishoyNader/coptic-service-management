@@ -33,7 +33,7 @@ export default async function ServantMembersPage({
 
   let query = supabase
     .from("profiles")
-    .select("id, full_name, phone, status", { count: "exact" })
+    .select("id, full_name, phone, status, served_members(class)", { count: "exact" })
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
     .order("id")
@@ -97,10 +97,17 @@ export default async function ServantMembersPage({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.full_name}</p>
-                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground" dir="ltr">
-                    <Phone className="size-3" />
-                    {m.phone}
-                  </p>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1" dir="ltr">
+                      <Phone className="size-3" />
+                      {m.phone}
+                    </span>
+                    {(m.served_members as { class?: string } | null)?.class && (
+                      <span className="rounded-full bg-coptic-gold-soft px-2 py-0.5 text-[10px] font-medium text-coptic-gold">
+                        {(m.served_members as { class?: string } | null)?.class}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <ChevronLeft className="size-5 text-muted-foreground" />
               </Link>

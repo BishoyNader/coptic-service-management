@@ -167,6 +167,7 @@ type AdminCreateUserActionPayload = {
   address?: string
   fatherPhone?: string
   motherPhone?: string
+  memberClass?: string
 }
 
 export type AdminCreateUserActionResult =
@@ -228,6 +229,7 @@ export async function adminCreateUserAction(
     address: payload.address,
     fatherPhone: payload.fatherPhone,
     motherPhone: payload.motherPhone,
+    class: payload.memberClass,
   }
 
   return createAdminUser(adminClient, user.id, input)

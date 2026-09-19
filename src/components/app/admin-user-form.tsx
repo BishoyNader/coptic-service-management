@@ -64,6 +64,7 @@ export function AdminUserForm({
   const [fatherPhone, setFatherPhone] = useState("")
   const [motherPhone, setMotherPhone] = useState("")
   const [address, setAddress] = useState("")
+  const [memberClass, setMemberClass] = useState("")
 
   const [errors, setErrors] = useState<FieldErrors>(newFieldErrors())
   const [generalError, setGeneralError] = useState<string | null>(null)
@@ -83,6 +84,7 @@ export function AdminUserForm({
     setFatherPhone("")
     setMotherPhone("")
     setAddress("")
+    setMemberClass("")
     setErrors(newFieldErrors())
     setGeneralError(null)
     setPending(false)
@@ -161,6 +163,7 @@ export function AdminUserForm({
       fatherPhone: fatherPhone || undefined,
       motherPhone: motherPhone || undefined,
       address: address || undefined,
+      memberClass: memberClass || undefined,
     })
 
     setPending(false)
@@ -406,6 +409,17 @@ export function AdminUserForm({
                       onChange={(e) => setAddress(e.target.value)}
                       className="h-11 text-base"
                       placeholder="العنوان"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="au-memberClass">الصف (اختياري)</Label>
+                    <Input
+                      id="au-memberClass"
+                      value={memberClass}
+                      onChange={(e) => setMemberClass(e.target.value)}
+                      className="h-11 text-base"
+                      placeholder="مثال: الصف الأول"
                     />
                   </div>
                 </>

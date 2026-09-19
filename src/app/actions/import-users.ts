@@ -84,11 +84,17 @@ function validateRow(
     return { ok: false, message: `الصف ${rowNumber}: تاريخ الميلاد غير صحيح (${dobRaw})` }
   }
 
+  const passwordRaw = pick(row, "كلمة المرور", "password")
+  const password = passwordRaw || DEFAULT_PASSWORD
+  if (password.length < 8) {
+    return { ok: false, message: `الصف ${rowNumber}: كلمة المرور يجب أن تكون 8 أحرف على الأقل` }
+  }
+
   const input: AdminCreateUserInput = {
     role: role as Extract<AppRole, "SERVED_MEMBER" | "SERVANT">,
     fullName,
     phone: normalizedPhone,
-    password: DEFAULT_PASSWORD,
+    password,
     dateOfBirth,
   }
 
@@ -113,6 +119,9 @@ function validateRow(
 
     const address = pick(row, "العنوان", "address")
     if (address) input.address = address
+
+    const memberClass = pick(row, "الصف", "class")
+    if (memberClass) input.class = memberClass
   }
 
   return { ok: true, input }

@@ -24,6 +24,7 @@ export type Profile = {
 
 export type ServedMember = {
   profile_id: string
+  class: string | null
   notes: string | null
   created_at: string
   updated_at: string

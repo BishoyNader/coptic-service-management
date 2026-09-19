@@ -25,7 +25,7 @@ export default async function SuperAdminUserDetailPage({
   const profile = await getProfileById(supabase, id)
   if (!profile) notFound()
 
-  const [codesResult, attendanceResult, scoresResult] = await Promise.all([
+  const [codesResult, attendanceResult, scoresResult, memberDetailResult] = await Promise.all([
     supabase
       .from("personal_codes")
       .select("code, qr_token")
@@ -44,6 +44,11 @@ export default async function SuperAdminUserDetailPage({
       .eq("profile_id", id)
       .order("session_date", { ascending: false })
       .limit(50),
+    supabase
+      .from("served_members")
+      .select("class, notes")
+      .eq("profile_id", id)
+      .maybeSingle(),
   ])
 
   const attendance = (attendanceResult.data ?? []) as { id: string; attended_at: string }[]
@@ -79,6 +84,7 @@ export default async function SuperAdminUserDetailPage({
         qrToken={codesResult.data?.qr_token}
         attendance={attendance}
         scores={scores}
+        memberClass={memberDetailResult.data?.class ?? null}
         onSubmit={adminUpdateProfileAction}
         onChangeStatus={adminUpdateStatusAction}
       />

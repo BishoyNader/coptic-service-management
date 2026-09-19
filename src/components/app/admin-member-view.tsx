@@ -28,6 +28,7 @@ type AdminMemberViewProps = {
   qrToken?: string
   attendance: { id: string; attended_at: string }[]
   scores: { id: string; category: string; points: number; session_date: string; note: string | null }[]
+  memberClass?: string | null
   onSubmit: AdminProfileSubmit
   onChangeStatus?: (id: string, status: UserStatus) => Promise<{ ok: boolean; message: string }>
 }
@@ -44,6 +45,7 @@ export function AdminMemberView({
   qrToken,
   attendance,
   scores,
+  memberClass,
   onSubmit,
   onChangeStatus,
 }: AdminMemberViewProps) {
@@ -178,6 +180,9 @@ export function AdminMemberView({
               <InfoRow icon={<Phone className="size-4" />} label="رقم الأب" value={profile.father_phone ?? "—"} dir="ltr" />
               <InfoRow icon={<Phone className="size-4" />} label="رقم الأم" value={profile.mother_phone ?? "—"} dir="ltr" />
               <InfoRow icon={<MapPin className="size-4" />} label="العنوان" value={profile.address ?? "—"} />
+              {memberClass && (
+                <InfoRow icon={<User className="size-4" />} label="الصف" value={memberClass} />
+              )}
 
               {/* QR + personal code */}
                   <div className="border-t border-border px-4 py-4">

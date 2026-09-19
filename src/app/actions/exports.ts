@@ -64,19 +64,20 @@ export async function exportMembersAction(): Promise<ExportActionResult> {
 
   const { data } = await supabase
     .from("profiles")
-    .select("full_name, phone, role, status, date_of_birth, created_at")
+    .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class)")
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
     .limit(MEMBERS_EXPORT_LIMIT)
 
   const csv = toCsv(
-    ["الاسم", "الموبايل", "الدور", "الحالة", "تاريخ الميلاد", "تاريخ الإنشاء"],
+    ["الاسم", "الموبايل", "الدور", "الحالة", "تاريخ الميلاد", "الصف", "تاريخ الإنشاء"],
     (data ?? []).map((r) => [
       r.full_name,
       r.phone,
       r.role,
       r.status,
       r.date_of_birth ?? "",
+      (r.served_members as { class?: string } | null)?.class ?? "",
       new Date(r.created_at).toLocaleDateString("ar-EG"),
     ]),
   )
