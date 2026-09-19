@@ -243,3 +243,30 @@ export async function exportAuditLogAction(): Promise<ExportActionResult> {
 
   return { ok: true, csv, filename: "audit-log.csv" }
 }
+
+// --- Servants export ---------------------------------------------------------
+
+export async function exportServantsAction(): Promise<ExportActionResult> {
+  const supabase = await requireAdmin()
+  if (!supabase) return { ok: false, message: "غير مصرح" }
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("full_name, phone, status, created_at, servants(service_name)")
+    .eq("role", "SERVANT")
+    .order("full_name", { ascending: true })
+    .limit(MEMBERS_EXPORT_LIMIT)
+
+  const csv = toCsv(
+    ["\u0627\u0644\u0627\u0633\u0645", "\u0627\u0644\u0645\u0648\u0628\u0627\u064a\u0644", "\u0627\u0644\u062d\u0627\u0644\u0629", "\u0627\u0633\u0645 \u0627\u0644\u062e\u062f\u0645\u0629", "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u0646\u0634\u0627\u0621"],
+    (data ?? []).map((r) => [
+      r.full_name,
+      r.phone,
+      r.status,
+      (r.servants as { service_name?: string } | null)?.service_name ?? "",
+      new Date(r.created_at).toLocaleDateString("ar-EG"),
+    ]),
+  )
+
+  return { ok: true, csv, filename: "servants.csv" }
+}

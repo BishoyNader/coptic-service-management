@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/coptic/empty-state"
 import { AddUserButton } from "@/components/app/add-user-button"
 import { PaginationControls } from "@/components/app/pagination-controls"
 import { ImportUsersButton } from "@/components/app/import-users-button"
+import { ExportButton } from "@/components/app/export-button"
+import { exportServantsAction } from "@/app/actions/exports"
 
 export const metadata: Metadata = { title: "الخدام" }
 
@@ -46,6 +48,7 @@ export default async function SuperAdminServantsPage({
           <p className="text-sm text-muted-foreground">{total} خادم</p>
         </div>
         <div className="flex items-center gap-2">
+          <ExportButton action={exportServantsAction} label="تصدير CSV" />
           <ImportUsersButton role="SERVANT" label="استيراد" />
           <AddUserButton label="إضافة خادم" defaultRole="SERVANT" />
         </div>

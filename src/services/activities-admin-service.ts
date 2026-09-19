@@ -32,6 +32,8 @@ const ACTIVITY_ROLES = [...PUBLIC_REGISTRATION_ROLES] as readonly AppRole[]
 export type ActivityInput = {
   name: string
   for_role: AppRole
+  attendance_type: "CHURCH" | "SERVICE" | null
+  input_type: "checkbox" | "score"
   min_score: number
   max_score: number
   icon: string | null
@@ -82,11 +84,23 @@ export function validateActivity(raw: unknown): ActivityValidation {
     sort_order = 0
   }
 
+  let attendance_type: "CHURCH" | "SERVICE" | null = null
+  if (r.attendance_type === "CHURCH" || r.attendance_type === "SERVICE") {
+    attendance_type = r.attendance_type
+  }
+
+  let input_type: "checkbox" | "score" = "score"
+  if (r.input_type === "checkbox") {
+    input_type = "checkbox"
+  }
+
   return {
     ok: true,
     value: {
       name,
       for_role,
+      attendance_type,
+      input_type,
       min_score: Math.round(min_score * 100) / 100,
       max_score: Math.round(max_score * 100) / 100,
       icon,
@@ -99,6 +113,8 @@ function activityEditableFields(a: Activity): ActivityInput {
   return {
     name: a.name,
     for_role: a.for_role,
+    attendance_type: a.attendance_type,
+    input_type: a.input_type,
     min_score: Number(a.min_score),
     max_score: Number(a.max_score),
     icon: a.icon,
@@ -185,6 +201,8 @@ export async function updateActivity(
     .update({
       name: activity.name,
       for_role: activity.for_role,
+      attendance_type: activity.attendance_type,
+      input_type: activity.input_type,
       min_score: activity.min_score,
       max_score: activity.max_score,
       icon: activity.icon,

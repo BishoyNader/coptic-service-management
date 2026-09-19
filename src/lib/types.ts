@@ -110,6 +110,8 @@ export type Activity = {
   name: string
   icon: string | null
   for_role: AppRole
+  attendance_type: AttendanceType | null
+  input_type: "checkbox" | "score"
   min_score: number
   max_score: number
   is_active: boolean

@@ -416,6 +416,10 @@ function MemberCard({
   const busy = busyAttendance?.memberId === member.id && busyAttendance !== null
   const saving = savingMember === member.id
 
+  const churchActivities = activities.filter((a) => a.attendance_type === "CHURCH")
+  const serviceActivities = activities.filter((a) => a.attendance_type === "SERVICE")
+  const generalActivities = activities.filter((a) => !a.attendance_type)
+
   return (
     <div
       data-testid={`board-member-${member.id}`}
@@ -433,24 +437,25 @@ function MemberCard({
         </div>
       </div>
 
-      {/* Attendance */}
-      <div className="grid grid-cols-2 gap-2">
-        {ATTENDANCE_TYPES.map((type) => {
-          const record = member.attendance.find((a) => a.type === type) ?? null
-          const removable =
-            record !== null && (record.recordedBy === currentUserId || allowRemoveAny)
-          const chipBusy = busy && busyAttendance!.type === type
-          const removeBusy = busyRemoveId === record?.id
-          return (
+      {/* Attendance sections with related activities */}
+      {ATTENDANCE_TYPES.map((type) => {
+        const record = member.attendance.find((a) => a.type === type) ?? null
+        const removable =
+          record !== null && (record.recordedBy === currentUserId || allowRemoveAny)
+        const chipBusy = busy && busyAttendance!.type === type
+        const removeBusy = busyRemoveId === record?.id
+        const relatedActivities = type === "CHURCH" ? churchActivities : serviceActivities
+
+        return (
+          <div key={type} className="space-y-2">
             <button
-              key={type}
               type="button"
               disabled={!editable || chipBusy || removeBusy}
               onClick={() => onToggleAttendance(member, type)}
               aria-label={`${ATTENDANCE_TYPE_LABELS[type]} — ${member.full_name} — ${record ? "سُجل" : "لم يُسجَّل"}`}
               data-testid={`attendance-chip-${type}-${member.id}`}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-xl border px-3 py-2 text-center text-xs font-medium transition-colors",
+                "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-medium transition-colors",
                 record
                   ? "border-coptic-teal/30 bg-coptic-teal/10 text-coptic-teal"
                   : "border-border bg-muted/40 text-muted-foreground",
@@ -458,14 +463,16 @@ function MemberCard({
                 removeBusy && "opacity-60"
               )}
             >
-              {chipBusy || removeBusy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : record ? (
-                <Check className="size-4" />
-              ) : (
-                <Clock className="size-4" />
-              )}
-              <span>{ATTENDANCE_TYPE_LABELS[type]}</span>
+              <span className="flex items-center gap-2">
+                {chipBusy || removeBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : record ? (
+                  <Check className="size-4" />
+                ) : (
+                  <Clock className="size-4" />
+                )}
+                {ATTENDANCE_TYPE_LABELS[type]}
+              </span>
               <span className={cn("text-[10px]", record ? "font-bold" : "")}>
                 {record
                   ? editable && removable
@@ -476,65 +483,50 @@ function MemberCard({
                     : "غائب"}
               </span>
             </button>
-          )
-        })}
-      </div>
 
-      {/* Activity scores */}
-      {activities.length > 0 ? (
+            {relatedActivities.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {relatedActivities.map((a) => (
+                  <ActivityInput
+                    key={a.id}
+                    activity={a}
+                    member={member}
+                    editable={editable}
+                    existing={scoreFor(member, a.id)}
+                    draftValue={draftValue}
+                    setDraft={setDraft}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* General activities (not tied to attendance type) */}
+      {generalActivities.length > 0 && (
         <div className="space-y-2">
+          <p className="text-[11px] font-medium text-muted-foreground">أنشطة عامة</p>
           <div className="grid grid-cols-2 gap-2">
-            {activities.map((a) => {
-              const existing = scoreFor(member, a.id)
-              const Icon = a.icon ? ICONS[a.icon] : ClipboardList
-              return (
-                <label
-                  key={a.id}
-                  className="flex items-center gap-2 rounded-xl bg-secondary/40 px-2.5 py-2"
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
-                    <Icon className="size-3.5" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[11px] font-medium">{a.name}</span>
-                    <span className="block text-[10px] text-muted-foreground">
-                      {Number(a.min_score)}–{Number(a.max_score)}
-                    </span>
-                  </span>
-                  {editable ? (
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min={Number(a.min_score)}
-                      max={Number(a.max_score)}
-                      step="0.5"
-                      value={draftValue(member.id, a.id, existing)}
-                      onChange={(e) => setDraft(member.id, a.id, e.target.value)}
-                      aria-label={`درجة ${a.name} — ${member.full_name}`}
-                      data-testid={`activity-input-${a.id}-${member.id}`}
-                      className="h-8 w-14 rounded-lg border border-input bg-transparent px-1.5 text-center text-sm font-bold outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        "h-8 w-14 rounded-lg bg-background px-1.5 py-1.5 text-center text-sm font-bold",
-                        existing > 0 ? "text-coptic-teal" : "text-muted-foreground"
-                      )}
-                    >
-                      {existing > 0 ? existing : "—"}
-                    </span>
-                  )}
-                </label>
-              )
-            })}
+            {generalActivities.map((a) => (
+              <ActivityInput
+                key={a.id}
+                activity={a}
+                member={member}
+                editable={editable}
+                existing={scoreFor(member, a.id)}
+                draftValue={draftValue}
+                setDraft={setDraft}
+              />
+            ))}
           </div>
         </div>
-      ) : (
-        !editable && (
-          <p className="text-center text-[11px] text-muted-foreground">
-            لا توجد أنشطة للتقييم
-          </p>
-        )
+      )}
+
+      {activities.length === 0 && !editable && (
+        <p className="text-center text-[11px] text-muted-foreground">
+          لا توجد أنشطة للتقييم
+        </p>
       )}
 
       {editable ? (
@@ -551,5 +543,82 @@ function MemberCard({
         </Button>
       ) : null}
     </div>
+  )
+}
+
+function ActivityInput({
+  activity,
+  member,
+  editable,
+  existing,
+  draftValue,
+  setDraft,
+}: {
+  activity: Board["activities"][number]
+  member: ScoringBoardMember
+  editable: boolean
+  existing: number
+  draftValue: (memberId: string, activityId: string, existing: number) => string
+  setDraft: (memberId: string, activityId: string, value: string) => void
+}) {
+  const Icon = activity.icon ? ICONS[activity.icon] : ClipboardList
+  const isCheckbox = activity.input_type === "checkbox"
+  const isChecked = existing > 0
+
+  return (
+    <label
+      key={activity.id}
+      className="flex items-center gap-2 rounded-xl bg-secondary/40 px-2.5 py-2"
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+        <Icon className="size-3.5" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[11px] font-medium">{activity.name}</span>
+        <span className="block text-[10px] text-muted-foreground">
+          {isCheckbox
+            ? isChecked
+              ? `+${activity.max_score}`
+              : "لم يُنجز"
+            : `${Number(activity.min_score)}–${Number(activity.max_score)}`}
+        </span>
+      </span>
+      {editable ? (
+        isCheckbox ? (
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={(e) =>
+              setDraft(member.id, activity.id, e.target.checked ? String(activity.max_score) : "0")
+            }
+            aria-label={`${activity.name} — ${member.full_name}`}
+            data-testid={`activity-input-${activity.id}-${member.id}`}
+            className="size-5 shrink-0 rounded border-input accent-coptic-teal"
+          />
+        ) : (
+          <input
+            type="number"
+            inputMode="decimal"
+            min={Number(activity.min_score)}
+            max={Number(activity.max_score)}
+            step="0.5"
+            value={draftValue(member.id, activity.id, existing)}
+            onChange={(e) => setDraft(member.id, activity.id, e.target.value)}
+            aria-label={`درجة ${activity.name} — ${member.full_name}`}
+            data-testid={`activity-input-${activity.id}-${member.id}`}
+            className="h-8 w-14 rounded-lg border border-input bg-transparent px-1.5 text-center text-sm font-bold outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+          />
+        )
+      ) : (
+        <span
+          className={cn(
+            "h-8 w-14 rounded-lg bg-background px-1.5 py-1.5 text-center text-sm font-bold",
+            existing > 0 ? "text-coptic-teal" : "text-muted-foreground"
+          )}
+        >
+          {existing > 0 ? existing : "—"}
+        </span>
+      )}
+    </label>
   )
 }

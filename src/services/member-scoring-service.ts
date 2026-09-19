@@ -28,6 +28,8 @@ export type GradedActivity = {
   name: string
   icon: string | null
   for_role: AppRole
+  attendance_type: "CHURCH" | "SERVICE" | null
+  input_type: "checkbox" | "score"
   min_score: number
   max_score: number
   sort_order: number
@@ -70,7 +72,7 @@ export async function listGradedActivities(
 ): Promise<GradedActivity[]> {
   const { data } = await admin
     .from("activities")
-    .select("id, code, name, icon, for_role, min_score, max_score, sort_order")
+    .select("id, code, name, icon, for_role, attendance_type, input_type, min_score, max_score, sort_order")
     .eq("is_active", true)
     .eq("for_role", role)
     .order("sort_order", { ascending: true })
