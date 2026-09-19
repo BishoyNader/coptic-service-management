@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Users, Phone, ChevronLeft, Search } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { LIST_PAGE_SIZE } from "@/lib/pagination"
@@ -12,6 +13,7 @@ import { PaginationControls } from "@/components/app/pagination-controls"
 import { ExportButton } from "@/components/app/export-button"
 import { ImportUsersButton } from "@/components/app/import-users-button"
 import { exportMembersAction } from "@/app/actions/exports"
+import { listActiveClasses } from "@/services/classes-service"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
@@ -30,6 +32,8 @@ export default async function SuperAdminMembersPage({
   const from = (page - 1) * LIST_PAGE_SIZE
   const to = from + LIST_PAGE_SIZE - 1
   const q = (sp.q ?? "").trim()
+
+  const classes = await listActiveClasses(createAdminClient())
 
   let query = supabase
     .from("profiles")
@@ -59,7 +63,7 @@ export default async function SuperAdminMembersPage({
         <div className="flex items-center gap-2">
           <ExportButton action={exportMembersAction} label="تصدير CSV" />
           <ImportUsersButton role="SERVED_MEMBER" label="استيراد" />
-          <AddUserButton label="إضافة مخدوم" defaultRole="SERVED_MEMBER" />
+          <AddUserButton label="إضافة مخدوم" defaultRole="SERVED_MEMBER" classes={classes} />
         </div>
       </div>
 

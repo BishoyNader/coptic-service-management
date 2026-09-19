@@ -7,9 +7,11 @@ import { AdminUserForm } from "@/components/app/admin-user-form"
 export function AddUserButton({
   label = "إضافة",
   defaultRole,
+  classes = [],
 }: {
   label?: string
   defaultRole: "SERVED_MEMBER" | "SERVANT"
+  classes?: { id: string; name: string }[]
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -23,6 +25,7 @@ export function AddUserButton({
         onOpenChange={setOpen}
         initialRole={defaultRole}
         allowRoleSelection
+        classes={classes}
       />
     </>
   )

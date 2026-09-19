@@ -43,6 +43,8 @@ type AdminUserFormProps = {
   initialRole: MemberRole
   /** When true the caller lets the admin pick the role (Super Admin). */
   allowRoleSelection?: boolean
+  /** Available classes for served member assignment. */
+  classes?: { id: string; name: string }[]
 }
 
 const newFieldErrors = (): FieldErrors => ({})
@@ -52,6 +54,7 @@ export function AdminUserForm({
   onOpenChange,
   initialRole,
   allowRoleSelection = false,
+  classes = [],
 }: AdminUserFormProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
@@ -414,13 +417,19 @@ export function AdminUserForm({
 
                   <div className="space-y-2">
                     <Label htmlFor="au-memberClass">الصف (اختياري)</Label>
-                    <Input
+                    <select
                       id="au-memberClass"
                       value={memberClass}
                       onChange={(e) => setMemberClass(e.target.value)}
-                      className="h-11 text-base"
-                      placeholder="مثال: الصف الأول"
-                    />
+                      className="flex h-11 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+                    >
+                      <option value="">بدون صنف</option>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </>
               )}

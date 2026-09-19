@@ -11,6 +11,13 @@ import {
   validateScoringRule,
   type RuleMutationResult,
 } from "@/services/settings-service"
+import {
+  createClass,
+  updateClass,
+  deleteClass,
+  validateClass,
+  type ClassMutationResult,
+} from "@/services/classes-service"
 
 /**
  * Settings are SUPER_ADMIN only here. The actor is verified from the session
@@ -90,4 +97,33 @@ export async function restoreScoringRuleAction(ruleId: unknown): Promise<RuleMut
     actorId: actor.actorId,
     ruleId,
   })
+}
+
+// --- Class management -------------------------------------------------------
+
+export async function createClassAction(raw: unknown): Promise<ClassMutationResult> {
+  const actor = await requireSuperAdmin()
+  if (!actor) return { ok: false, message: "غير مصرح" }
+  const validation = validateClass(raw)
+  if (!validation.ok) return validation
+  return createClass(createAdminClient(), { actorId: actor.actorId, cls: validation.value })
+}
+
+export async function updateClassAction(
+  classId: unknown,
+  raw: unknown
+): Promise<ClassMutationResult> {
+  const actor = await requireSuperAdmin()
+  if (!actor) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(classId)) return { ok: false, message: "بيانات غير صحيحة" }
+  const validation = validateClass(raw)
+  if (!validation.ok) return validation
+  return updateClass(createAdminClient(), { actorId: actor.actorId, classId, cls: validation.value })
+}
+
+export async function deleteClassAction(classId: unknown): Promise<ClassMutationResult> {
+  const actor = await requireSuperAdmin()
+  if (!actor) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(classId)) return { ok: false, message: "بيانات غير صحيحة" }
+  return deleteClass(createAdminClient(), { actorId: actor.actorId, classId })
 }

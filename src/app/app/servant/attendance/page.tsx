@@ -61,7 +61,7 @@ export default async function ServantAttendancePage({ searchParams }: Props) {
       .limit(100),
     supabase
       .from("profiles")
-      .select("id, full_name, role, phone")
+      .select("id, full_name, role, phone, served_members(class)")
       .in("role", [ROLES.SERVED_MEMBER, ROLES.SERVANT])
       .eq("status", "ACTIVE")
       .order("full_name")
@@ -75,6 +75,7 @@ export default async function ServantAttendancePage({ searchParams }: Props) {
     fullName: p.full_name as string,
     role: p.role as "SERVED_MEMBER" | "SERVANT",
     phone: p.phone as string,
+    className: (p.served_members as { class?: string } | null)?.class ?? null,
   }))
 
   const [fridayGrid, fridayMinistry] = await Promise.all([

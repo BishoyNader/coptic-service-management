@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { listScoringRulesForSettings } from "@/services/settings-service"
-import { ScoringRulesSettings } from "@/components/app/scoring-rules-settings"
+import { listClasses } from "@/services/classes-service"
+import { SettingsPageContent } from "@/components/app/settings-page-content"
 
 export const metadata: Metadata = { title: "الإعدادات" }
 
@@ -14,18 +15,11 @@ export default async function SuperAdminSettingsPage() {
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SUPER_ADMIN) redirect("/")
 
-  const rules = await listScoringRulesForSettings(createAdminClient())
+  const admin = createAdminClient()
+  const [rules, classes] = await Promise.all([
+    listScoringRulesForSettings(admin),
+    listClasses(admin),
+  ])
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="font-heading text-xl font-extrabold">الإعدادات</h1>
-        <p className="text-sm text-muted-foreground">
-          قواعد الدرجات — مسؤول عام فقط
-        </p>
-      </div>
-
-      <ScoringRulesSettings rules={rules} />
-    </div>
-  )
+  return <SettingsPageContent rules={rules} classes={classes} />
 }

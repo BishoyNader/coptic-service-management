@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, UserPlus, Loader2, Check, Star, Clock } from "lucide-react"
+import { Search, UserPlus, Loader2, Check, Star, Clock, Users } from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
@@ -27,7 +27,10 @@ export type ManualAttendancePerson = {
   fullName: string
   role: AppRole
   phone: string
+  className?: string | null
 }
+
+type Tab = "MEMBERS" | "SERVANTS"
 
 type ManualAttendanceDialogProps = {
   people: ManualAttendancePerson[]
@@ -37,8 +40,8 @@ type ManualAttendanceDialogProps = {
 }
 
 /**
- * "+ تسجيل حضور يدوي" — pick a person, type, and scoring rule.
- * Records attendance for the selected Friday using the rule's time band.
+ * "+ تسجيل حضور يدوي" — two tabs: served members (grouped by class) and
+ * servants. Pick a person, type, and scoring rule.
  */
 export function ManualAttendanceDialog({
   people,
@@ -54,16 +57,41 @@ export function ManualAttendanceDialog({
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ name: string; time: string } | null>(null)
+  const [tab, setTab] = useState<Tab>("MEMBERS")
 
-  const filtered = useMemo(() => {
+  const members = useMemo(() => people.filter((p) => p.role === "SERVED_MEMBER"), [people])
+  const servants = useMemo(() => people.filter((p) => p.role === "SERVANT"), [people])
+
+  const filteredMembers = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return people
-    return people.filter(
+    if (!q) return members
+    return members.filter(
       (p) =>
         p.fullName.toLowerCase().includes(q) ||
         p.phone.replace(/\D/g, "").includes(q.replace(/\D/g, ""))
     )
-  }, [people, query])
+  }, [members, query])
+
+  const filteredServants = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return servants
+    return servants.filter(
+      (p) =>
+        p.fullName.toLowerCase().includes(q) ||
+        p.phone.replace(/\D/g, "").includes(q.replace(/\D/g, ""))
+    )
+  }, [servants, query])
+
+  const groupedMembers = useMemo(() => {
+    const groups = new Map<string, ManualAttendancePerson[]>()
+    for (const p of filteredMembers) {
+      const cls = p.className || "بدون صنف"
+      const list = groups.get(cls) ?? []
+      list.push(p)
+      groups.set(cls, list)
+    }
+    return groups
+  }, [filteredMembers])
 
   const applicableRules = useMemo(() => {
     const category = CATEGORY_BY_ATTENDANCE[type]
@@ -93,7 +121,10 @@ export function ManualAttendanceDialog({
     setSelectedRuleId(null)
     setDone(null)
     setBusy(false)
+    setTab("MEMBERS")
   }
+
+  const displayList = tab === "MEMBERS" ? filteredMembers : filteredServants
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
@@ -130,6 +161,44 @@ export function ManualAttendanceDialog({
           </div>
         ) : (
           <>
+            {/* Tabs: Members / Servants */}
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/60 p-1">
+              <button
+                type="button"
+                aria-pressed={tab === "MEMBERS"}
+                onClick={() => {
+                  setTab("MEMBERS")
+                  setSelected(null)
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors",
+                  tab === "MEMBERS"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Users className="size-4" />
+                المخدومين ({members.length})
+              </button>
+              <button
+                type="button"
+                aria-pressed={tab === "SERVANTS"}
+                onClick={() => {
+                  setTab("SERVANTS")
+                  setSelected(null)
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors",
+                  tab === "SERVANTS"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Users className="size-4" />
+                الخدام ({servants.length})
+              </button>
+            </div>
+
             {/* Search */}
             <div className="relative">
               <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -210,39 +279,36 @@ export function ManualAttendanceDialog({
 
             {/* People list */}
             <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
-              {filtered.length === 0 ? (
+              {displayList.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
                   مفيش نتايج مطابقة
                 </p>
+              ) : tab === "MEMBERS" ? (
+                // Grouped by class
+                Array.from(groupedMembers.entries()).map(([cls, group]) => (
+                  <div key={cls} className="space-y-1">
+                    <p className="sticky top-0 bg-background/95 px-1 pt-1 pb-0.5 text-[11px] font-bold text-muted-foreground backdrop-blur">
+                      {cls}
+                    </p>
+                    {group.map((p) => (
+                      <PersonRow
+                        key={p.id}
+                        person={p}
+                        selected={selected?.id === p.id}
+                        onSelect={() => setSelected(p)}
+                      />
+                    ))}
+                  </div>
+                ))
               ) : (
-                filtered.map((p) => (
-                  <button
+                // Flat list for servants
+                filteredServants.map((p) => (
+                  <PersonRow
                     key={p.id}
-                    type="button"
-                    onClick={() => setSelected(p)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-start transition-colors",
-                      selected?.id === p.id
-                        ? "bg-coptic-teal/10 ring-1 ring-coptic-teal/30"
-                        : "hover:bg-secondary/60"
-                    )}
-                  >
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
-                      {p.fullName.trim().charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{p.fullName}</p>
-                      <p className="text-[11px] text-muted-foreground" dir="ltr">
-                        {p.phone}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
-                      {ROLE_LABELS[p.role]}
-                    </span>
-                    {selected?.id === p.id ? (
-                      <Check className="size-4 text-coptic-teal" />
-                    ) : null}
-                  </button>
+                    person={p}
+                    selected={selected?.id === p.id}
+                    onSelect={() => setSelected(p)}
+                  />
                 ))
               )}
             </div>
@@ -280,5 +346,42 @@ export function ManualAttendanceDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function PersonRow({
+  person,
+  selected,
+  onSelect,
+}: {
+  person: ManualAttendancePerson
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-start transition-colors",
+        selected
+          ? "bg-coptic-teal/10 ring-1 ring-coptic-teal/30"
+          : "hover:bg-secondary/60"
+      )}
+    >
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
+        {person.fullName.trim().charAt(0)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{person.fullName}</p>
+        <p className="text-[11px] text-muted-foreground" dir="ltr">
+          {person.phone}
+        </p>
+      </div>
+      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
+        {ROLE_LABELS[person.role]}
+      </span>
+      {selected ? <Check className="size-4 text-coptic-teal" /> : null}
+    </button>
   )
 }
