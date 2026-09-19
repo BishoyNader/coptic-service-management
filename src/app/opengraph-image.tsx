@@ -15,13 +15,12 @@ export default function Image() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #0E6E5C 0%, #0a5a4a 50%, #0E6E5C 100%)",
+          background: "#0E6E5C",
           fontFamily: "sans-serif",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Decorative pattern */}
         <div
           style={{
             position: "absolute",
@@ -29,13 +28,12 @@ export default function Image() {
             left: 0,
             right: 0,
             bottom: 0,
-            opacity: 0.06,
+            opacity: 0.05,
             backgroundImage:
               "repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,0.5) 35px, rgba(255,255,255,0.5) 36px)",
           }}
         />
 
-        {/* Gold accent line */}
         <div
           style={{
             position: "absolute",
@@ -48,7 +46,6 @@ export default function Image() {
           }}
         />
 
-        {/* Cross icon */}
         <svg
           viewBox="0 0 24 24"
           width="120"
@@ -73,7 +70,6 @@ export default function Image() {
           <circle cx="12" cy="12" r="1.3" fill="#C8A84E" />
         </svg>
 
-        {/* App name */}
         <div
           style={{
             fontSize: 72,
@@ -87,7 +83,6 @@ export default function Image() {
           خدمتي
         </div>
 
-        {/* Tagline */}
         <div
           style={{
             fontSize: 28,
@@ -99,7 +94,6 @@ export default function Image() {
           كنيسة السيدة العذراء - وادي حوف
         </div>
 
-        {/* Subtitle */}
         <div
           style={{
             fontSize: 22,
@@ -111,7 +105,6 @@ export default function Image() {
           تطبيق إدارة الخدمة
         </div>
 
-        {/* Gold bottom line */}
         <div
           style={{
             position: "absolute",
