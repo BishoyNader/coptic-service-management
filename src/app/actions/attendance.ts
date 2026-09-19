@@ -9,6 +9,7 @@ import {
   checkInByProfileId,
   correctAttendance,
   getServerNow,
+  recordManualAttendance,
   resolvePersonByIdentifier,
   type AttendanceCorrection,
 } from "@/services/attendance-service"
@@ -175,6 +176,54 @@ export async function manualAttendanceAction(
     type,
   })
   console.log("[attendance.manualAttendanceAction]", { profileId, type, status: outcome.status, message: outcome.status === "error" ? outcome.message : undefined })
+
+  if (outcome.status === "error") return outcome
+  if (outcome.status === "success") {
+    return {
+      status: "success",
+      person: outcome.person,
+      attendedAt: outcome.attendedAt,
+      cairoTime: outcome.cairoTime,
+      type: outcome.type,
+      source: outcome.source,
+      points: outcome.points,
+      ruleName: outcome.ruleName,
+    }
+  }
+  return {
+    status: "duplicate",
+    person: outcome.person,
+    attendedAt: outcome.attendedAt,
+    type: outcome.type,
+    points: outcome.points,
+  }
+}
+
+/**
+ * Manual attendance for a specific Friday — the servant picks a scoring rule
+ * whose start_time pins the attendance instant. Used by the manual attendance
+ * dialog when recording attendance for a past or present Friday.
+ */
+export async function recordManualAttendanceAction(
+  profileId: string,
+  ruleId: string,
+  sessionDate: string
+): Promise<RecordAttendanceResult> {
+  const actor = await requireAttendanceActor()
+  if (!actor) return { status: "error", message: "غير مصرح" }
+  if (!isUuid(profileId)) return { status: "error", message: "بيانات غير صحيحة" }
+  if (!isUuid(ruleId)) return { status: "error", message: "نقطة التسجيل غير صحيحة" }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sessionDate)) {
+    return { status: "error", message: "التاريخ غير صحيح" }
+  }
+
+  const admin = createAdminClient()
+  const outcome = await recordManualAttendance(admin, {
+    actorId: actor.actorId,
+    profileId,
+    ruleId,
+    sessionDate,
+  })
 
   if (outcome.status === "error") return outcome
   if (outcome.status === "success") {

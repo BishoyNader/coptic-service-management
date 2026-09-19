@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { ScanLine, History } from "lucide-react"
+import { ScanLine } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
@@ -11,31 +11,51 @@ import { ATTENDANCE_TYPE_LABELS, ATTENDANCE_SOURCE_LABELS } from "@/lib/constant
 import { formatCairoTime } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
+import { getActiveStudyYear } from "@/services/study-year-service"
+import { getActiveScoringRules } from "@/services/scoring-service"
+import { currentFridayIn } from "@/lib/friday"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
 import { ManualAttendanceDialog } from "@/components/app/manual-attendance-dialog"
 import { FridayDashboard } from "@/components/app/friday-dashboard"
+import { FridayPicker } from "@/components/app/friday-picker"
 import { NileDivider } from "@/components/coptic/brand"
 
 export const metadata: Metadata = { title: "تسجيل حضور" }
 
-export default async function ServantAttendancePage() {
+type Props = { searchParams: Promise<{ friday?: string }> }
+
+export default async function ServantAttendancePage({ searchParams }: Props) {
   const supabase = await createClient()
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SERVANT) redirect("/")
 
-  const now = new Date()
-  const dayStart = cairoDayStart(now).toISOString()
-  const dayEnd = cairoDayEnd(now).toISOString()
+  const params = await searchParams
+  const admin = createAdminClient()
+  const now = getServerNow()
 
-  const [recordsResult, peopleResult] = await Promise.all([
+  // Study year + schedule
+  const studyYear = await getActiveStudyYear(admin, cairoDateString(now))
+  const schedule = studyYear?.schedule ?? []
+
+  // Selected Friday (from URL or default to current Friday)
+  const selectedFriday =
+    (params.friday && schedule.includes(params.friday))
+      ? params.friday
+      : (currentFridayIn(schedule, now) ?? cairoDateString(now))
+
+  // Attendance records for the selected Friday
+  const fridayDayStart = cairoDayStart(new Date(`${selectedFriday}T12:00:00Z`)).toISOString()
+  const fridayDayEnd = cairoDayEnd(new Date(`${selectedFriday}T12:00:00Z`)).toISOString()
+
+  const [recordsResult, peopleResult, rulesResult] = await Promise.all([
     supabase
       .from("attendance_records")
       .select(
         "id, attended_at, points, source, status, session:attendance_sessions(type), profile:profiles!attendance_records_profile_id_fkey(full_name, role)"
       )
-      .gte("attended_at", dayStart)
-      .lt("attended_at", dayEnd)
+      .gte("attended_at", fridayDayStart)
+      .lt("attended_at", fridayDayEnd)
       .neq("status", "ARCHIVED")
       .order("attended_at", { ascending: false })
       .limit(100),
@@ -46,6 +66,7 @@ export default async function ServantAttendancePage() {
       .eq("status", "ACTIVE")
       .order("full_name")
       .limit(300),
+    getActiveScoringRules(admin),
   ])
 
   const records = toAttendanceRows((recordsResult.data ?? []) as never[])
@@ -56,34 +77,42 @@ export default async function ServantAttendancePage() {
     phone: p.phone as string,
   }))
 
-  const today = cairoDateString(now)
-
   const [fridayGrid, fridayMinistry] = await Promise.all([
-    getFridayAttendanceGrid(createAdminClient(), cairoDateString(getServerNow())),
-    getFridayMinistryData(createAdminClient(), cairoDateString(getServerNow())),
+    getFridayAttendanceGrid(admin, selectedFriday),
+    getFridayMinistryData(admin, selectedFriday),
   ])
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-xl font-extrabold">تسجيل حضور</h1>
-        <p className="text-sm text-muted-foreground">قاعةُ الخدمة — اليوم {today}</p>
+      {/* Friday picker at top */}
+      <div className="space-y-3">
+        <div>
+          <h1 className="font-heading text-xl font-extrabold">تسجيل حضور</h1>
+          <p className="text-sm text-muted-foreground">قاعةُ الخدمة</p>
+        </div>
+        {schedule.length > 0 && (
+          <FridayPicker schedule={schedule} selected={selectedFriday} />
+        )}
       </div>
 
       <AttendanceCheckIn defaultType="CHURCH" />
 
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-heading font-bold">سجل النهارده</p>
+          <p className="font-heading font-bold">سجل الجمعة</p>
           <p className="text-xs text-muted-foreground">{records.length} حضور مسجّل</p>
         </div>
-        <ManualAttendanceDialog people={people} />
+        <ManualAttendanceDialog
+          people={people}
+          attendanceRules={rulesResult}
+          selectedFriday={selectedFriday}
+        />
       </div>
 
       {records.length === 0 ? (
         <EmptyState
           icon={<ScanLine className="size-7" />}
-          title="لسه مفيش حضور النهارده"
+          title="لسه مفيش حضور الجمعة دي"
           description="ابدأ بتسجيل أول حضور"
         />
       ) : (

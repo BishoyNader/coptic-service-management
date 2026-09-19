@@ -2,14 +2,15 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, UserPlus, Loader2, Check, Star } from "lucide-react"
+import { Search, UserPlus, Loader2, Check, Star, Clock } from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
 import { ROLE_LABELS, type AppRole } from "@/lib/roles"
 import { formatCairoTime } from "@/lib/cairo"
-import type { AttendanceType } from "@/lib/types"
-import { manualAttendanceAction } from "@/app/actions/attendance"
+import type { AttendanceType, ScoringRule } from "@/lib/types"
+import { CATEGORY_BY_ATTENDANCE } from "@/services/attendance-rules"
+import { recordManualAttendanceAction } from "@/app/actions/attendance"
 import {
   Dialog,
   DialogContent,
@@ -30,15 +31,19 @@ export type ManualAttendancePerson = {
 
 type ManualAttendanceDialogProps = {
   people: ManualAttendancePerson[]
+  attendanceRules: ScoringRule[]
+  selectedFriday: string
   defaultType?: AttendanceType
 }
 
 /**
- * "+ تسجيل حضور يدوي" — pick a person, pick the attendance type. The server
- * still decides the current time and the scoring window; admins cannot backdate.
+ * "+ تسجيل حضور يدوي" — pick a person, type, and scoring rule.
+ * Records attendance for the selected Friday using the rule's time band.
  */
 export function ManualAttendanceDialog({
   people,
+  attendanceRules,
+  selectedFriday,
   defaultType = "CHURCH",
 }: ManualAttendanceDialogProps) {
   const router = useRouter()
@@ -46,6 +51,7 @@ export function ManualAttendanceDialog({
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<ManualAttendancePerson | null>(null)
   const [type, setType] = useState<AttendanceType>(defaultType)
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ name: string; time: string } | null>(null)
 
@@ -59,10 +65,15 @@ export function ManualAttendanceDialog({
     )
   }, [people, query])
 
+  const applicableRules = useMemo(() => {
+    const category = CATEGORY_BY_ATTENDANCE[type]
+    return attendanceRules.filter((r) => r.category === category && r.is_active)
+  }, [attendanceRules, type])
+
   const confirm = async () => {
-    if (!selected) return
+    if (!selected || !selectedRuleId) return
     setBusy(true)
-    const res = await manualAttendanceAction(selected.id, type)
+    const res = await recordManualAttendanceAction(selected.id, selectedRuleId, selectedFriday)
     setBusy(false)
     if (res.status === "success") {
       setDone({ name: selected.fullName, time: formatCairoTime(res.attendedAt!) })
@@ -79,6 +90,7 @@ export function ManualAttendanceDialog({
     setOpen(false)
     setQuery("")
     setSelected(null)
+    setSelectedRuleId(null)
     setDone(null)
     setBusy(false)
   }
@@ -92,7 +104,9 @@ export function ManualAttendanceDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>تسجيل حضور يدوي</DialogTitle>
-          <DialogDescription>اختر الشخص ثم نوع الحضور</DialogDescription>
+          <DialogDescription>
+            اختر الشخص ثم نوع الحضور ونقطة التسجيل — الجمعة {selectedFriday}
+          </DialogDescription>
         </DialogHeader>
 
         {done ? (
@@ -107,6 +121,7 @@ export function ManualAttendanceDialog({
               onClick={() => {
                 setDone(null)
                 setSelected(null)
+                setSelectedRuleId(null)
                 setQuery("")
               }}
             >
@@ -134,7 +149,10 @@ export function ManualAttendanceDialog({
                   key={t}
                   type="button"
                   aria-pressed={type === t}
-                  onClick={() => setType(t)}
+                  onClick={() => {
+                    setType(t)
+                    setSelectedRuleId(null)
+                  }}
                   className={cn(
                     "rounded-lg py-2 text-sm font-medium transition-colors",
                     type === t
@@ -146,6 +164,49 @@ export function ManualAttendanceDialog({
                 </button>
               ))}
             </div>
+
+            {/* Scoring rule selector */}
+            {applicableRules.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground">نقطة التسجيل</p>
+                <div className="flex flex-col gap-1">
+                  {applicableRules.map((rule) => (
+                    <button
+                      key={rule.id}
+                      type="button"
+                      onClick={() => setSelectedRuleId(rule.id)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-start transition-colors",
+                        selectedRuleId === rule.id
+                          ? "bg-coptic-teal/10 ring-1 ring-coptic-teal/30"
+                          : "hover:bg-secondary/60"
+                      )}
+                    >
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+                        <Clock className="size-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{rule.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {rule.start_time && rule.end_time
+                            ? `${rule.start_time}–${rule.end_time}`
+                            : rule.start_time
+                              ? `من ${rule.start_time}`
+                              : rule.end_time
+                                ? `حتى ${rule.end_time}`
+                                : "بدون حد زمني"}
+                          {" — "}
+                          <span className="font-bold">{rule.point_value} درجات</span>
+                        </p>
+                      </div>
+                      {selectedRuleId === rule.id ? (
+                        <Check className="size-4 text-coptic-teal" />
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* People list */}
             <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
@@ -195,6 +256,9 @@ export function ManualAttendanceDialog({
                   <p className="truncate text-sm font-bold">{selected.fullName}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {ROLE_LABELS[selected.role]} — {ATTENDANCE_TYPE_LABELS[type]}
+                    {selectedRuleId
+                      ? ` — ${applicableRules.find((r) => r.id === selectedRuleId)?.name ?? ""}`
+                      : ""}
                   </p>
                 </div>
               </div>
@@ -204,7 +268,11 @@ export function ManualAttendanceDialog({
 
         <DialogFooter>
           {!done ? (
-            <Button disabled={!selected || busy} onClick={confirm} className="gap-1.5">
+            <Button
+              disabled={!selected || !selectedRuleId || busy}
+              onClick={confirm}
+              className="gap-1.5"
+            >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               تأكيد التسجيل
             </Button>

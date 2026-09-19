@@ -6,33 +6,51 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { toAttendanceRows } from "@/services/attendance-service"
 import { ROLES } from "@/lib/roles"
-import { cairoDateString, daysAgoUtcISO } from "@/lib/cairo"
+import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
+import { getActiveStudyYear } from "@/services/study-year-service"
+import { getActiveScoringRules } from "@/services/scoring-service"
+import { currentFridayIn } from "@/lib/friday"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceManagement } from "@/components/app/attendance-management"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
 import { ManualAttendanceDialog } from "@/components/app/manual-attendance-dialog"
 import { FridayDashboard } from "@/components/app/friday-dashboard"
+import { FridayPicker } from "@/components/app/friday-picker"
 import { ATTENDANCE_PAGE_SIZE } from "@/lib/pagination"
 import { loadMoreAttendanceAction } from "@/app/actions/listing"
 
 export const metadata: Metadata = { title: "الحضور" }
 
-export default async function SuperAdminAttendancePage() {
+type Props = { searchParams: Promise<{ friday?: string }> }
+
+export default async function SuperAdminAttendancePage({ searchParams }: Props) {
   const supabase = await createClient()
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SUPER_ADMIN) redirect("/")
 
-  const since = daysAgoUtcISO(90)
+  const params = await searchParams
+  const admin = createAdminClient()
+  const now = getServerNow()
 
-  const [recordsResult, peopleResult] = await Promise.all([
+  // Study year + schedule
+  const studyYear = await getActiveStudyYear(admin, cairoDateString(now))
+  const schedule = studyYear?.schedule ?? []
+
+  // Selected Friday (from URL or default to current Friday)
+  const selectedFriday =
+    (params.friday && schedule.includes(params.friday))
+      ? params.friday
+      : (currentFridayIn(schedule, now) ?? cairoDateString(now))
+
+  const [recordsResult, peopleResult, rulesResult] = await Promise.all([
     supabase
       .from("attendance_records")
       .select(
         "id, attended_at, points, source, status, session:attendance_sessions(type), profile:profiles!attendance_records_profile_id_fkey(full_name, role)"
       )
-      .gte("attended_at", since)
+      .neq("status", "ARCHIVED")
       .order("attended_at", { ascending: false })
       .order("id")
       .limit(ATTENDANCE_PAGE_SIZE),
@@ -43,6 +61,7 @@ export default async function SuperAdminAttendancePage() {
       .eq("status", "ACTIVE")
       .order("full_name")
       .limit(300),
+    getActiveScoringRules(admin),
   ])
 
   const records = toAttendanceRows((recordsResult.data ?? []) as never[])
@@ -54,20 +73,30 @@ export default async function SuperAdminAttendancePage() {
   }))
 
   const [fridayGrid, fridayMinistry] = await Promise.all([
-    getFridayAttendanceGrid(createAdminClient(), cairoDateString(getServerNow())),
-    getFridayMinistryData(createAdminClient(), cairoDateString(getServerNow())),
+    getFridayAttendanceGrid(admin, selectedFriday),
+    getFridayMinistryData(admin, selectedFriday),
   ])
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h1 className="font-heading text-xl font-extrabold">سجل الحضور</h1>
-          <p className="text-sm text-muted-foreground">
-            متابعة كاملة للحضور — {cairoDateString(getServerNow())}
-          </p>
+      {/* Friday picker at top */}
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="font-heading text-xl font-extrabold">سجل الحضور</h1>
+            <p className="text-sm text-muted-foreground">
+              متابعة كاملة للحضور
+            </p>
+          </div>
+          <ManualAttendanceDialog
+            people={people}
+            attendanceRules={rulesResult}
+            selectedFriday={selectedFriday}
+          />
         </div>
-        <ManualAttendanceDialog people={people} />
+        {schedule.length > 0 && (
+          <FridayPicker schedule={schedule} selected={selectedFriday} />
+        )}
       </div>
 
       <div className="rounded-2xl bg-secondary/40 p-1 ring-1 ring-foreground/5">

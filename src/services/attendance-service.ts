@@ -635,6 +635,73 @@ export async function recordChildAttendance(
 }
 
 /**
+ * Manual attendance for any Friday — the servant picks a scoring rule whose
+ * start_time pins the attendance instant. The session date is the chosen
+ * Friday (not necessarily today). Used by the manual attendance dialog when
+ * recording attendance for a past or present Friday.
+ */
+export async function recordManualAttendance(
+  admin: SupabaseAdminClient,
+  params: {
+    actorId: string
+    profileId: string
+    ruleId: string
+    sessionDate: string
+  }
+): Promise<CheckInOutcome> {
+  const { actorId, profileId, ruleId, sessionDate } = params
+
+  const person = await resolvePersonByProfileId(admin, profileId)
+  if (!person) return { status: "error", message: "الشخص غير موجود" }
+  if (person.role !== ROLES.SERVED_MEMBER && person.role !== ROLES.SERVANT) {
+    return { status: "error", message: "هذا النوع من الحسابات لا يسجّل حضورًا" }
+  }
+  if (!sessionDate || !/^\d{4}-\d{2}-\d{2}$/.test(sessionDate)) {
+    return { status: "error", message: "التاريخ غير صحيح" }
+  }
+  if (!isCairoFriday(sessionDate)) {
+    return { status: "error", message: "الحضور يُسجَّل يوم الجمعة فقط" }
+  }
+
+  const cairoToday = cairoDateString(getServerNow())
+  if (sessionDate > cairoToday) {
+    return { status: "error", message: "لا يمكن تسجيل حضور في تاريخ مستقبلي" }
+  }
+
+  // Look up the scoring rule to determine type + time
+  const { data: rule } = await admin
+    .from("scoring_rules")
+    .select("*")
+    .eq("id", ruleId)
+    .maybeSingle()
+
+  if (!rule) return { status: "error", message: "نقطة التسجيل غير موجودة" }
+
+  const category = rule.category as string
+  let type: AttendanceType
+  if (category === "CHURCH_ATTENDANCE") {
+    type = "CHURCH"
+  } else if (category === "SERVICE_ATTENDANCE") {
+    type = "SERVICE"
+  } else {
+    return { status: "error", message: "نقطة التسجيل ليست من نوع حضور" }
+  }
+
+  // Reconstruct the instant from sessionDate + rule's start_time
+  const timeStr = (rule.start_time as string) || "07:00"
+  const now = cairoLocalToInstant(sessionDate, timeStr)
+
+  return executeCheckIn(admin, {
+    actorId,
+    person,
+    type,
+    source: "MANUAL",
+    now,
+    sessionDate,
+  })
+}
+
+/**
  * A servant may undo an attendance record THEY created for a child. A super
  * admin may undo any record (full access). The linked auto-derived score row
  * is removed by cascade, so weekly/monthly totals recompute from the
