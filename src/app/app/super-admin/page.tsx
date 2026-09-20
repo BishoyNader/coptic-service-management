@@ -5,8 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/services/profile-service"
 import { getUpcomingBirthdays } from "@/services/birthday-service"
 import { ROLES } from "@/lib/roles"
-import { cairoDayStart, cairoDayEnd, formatCairoTime } from "@/lib/cairo"
-import { toDateString } from "@/lib/dates"
+import { cairoDayStart, cairoDayEnd, cairoDateString, formatCairoTime } from "@/lib/cairo"
 import { StatCard } from "@/components/app/stat-cards"
 import { NileDivider } from "@/components/coptic/brand"
 import { Button } from "@/components/ui/button"
@@ -19,7 +18,7 @@ export default async function SuperAdminHomePage() {
   const now = new Date()
   const dayStart = cairoDayStart(now).toISOString()
   const dayEnd = cairoDayEnd(now).toISOString()
-  const today = toDateString(now)
+  const today = cairoDateString(now)
 
   const [members, servants, admins, todayAttendance, scoresToday, birthdays] = await Promise.all([
     supabase

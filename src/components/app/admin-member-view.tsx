@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil, X, QrCode, Star, MapPin, Phone, Calendar, User, Power, Archive, Loader2, Plus } from "lucide-react"
+import { Pencil, X, QrCode, Star, MapPin, Phone, Calendar, User, Power, Archive, Loader2, Church, Flame } from "lucide-react"
 import { cn } from "cn"
 import { QRCodeSVG } from "qrcode.react"
 import { toast } from "sonner"
@@ -58,6 +58,7 @@ export function AdminMemberView({
   const [confirm, setConfirm] = useState<"INACTIVE" | "ARCHIVED" | "ACTIVE" | null>(null)
   const [pending, setPending] = useState(false)
   const [addingAttendance, setAddingAttendance] = useState<"CHURCH_ATTENDANCE" | "SERVICE_ATTENDANCE" | null>(null)
+  const [attendanceConfirm, setAttendanceConfirm] = useState<"CHURCH_ATTENDANCE" | "SERVICE_ATTENDANCE" | null>(null)
 
   const handleStatus = async (status: UserStatus) => {
     if (!onChangeStatus) return
@@ -79,6 +80,7 @@ export function AdminMemberView({
       return
     }
     setAddingAttendance(category)
+    setAttendanceConfirm(null)
     const res = await addManualAttendanceScoreAction({
       profileId: profile.id,
       category,
@@ -339,66 +341,46 @@ export function AdminMemberView({
                 <p className="font-heading font-bold">الدرجات</p>
               </div>
 
-              {/* Add missing attendance scores */}
-              {(!hasChurchAttendance || !hasServiceAttendance) && (
-                <div className="space-y-2 border-b border-border px-4 py-3">
-                  <p className="text-[11px] text-muted-foreground">إضافة درجة حضور يدوياً</p>
-                  <div className="flex flex-wrap gap-2">
-                    {!hasChurchAttendance && (
-                      <button
-                        type="button"
-                        onClick={() => handleAddAttendance("CHURCH_ATTENDANCE")}
-                        disabled={!!addingAttendance}
-                        className="flex items-center gap-1.5 rounded-xl bg-coptic-gold-soft px-3 py-2 text-sm font-medium text-coptic-gold transition-colors hover:bg-coptic-gold-soft/70 disabled:opacity-50"
-                      >
-                        {addingAttendance === "CHURCH_ATTENDANCE" ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Plus className="size-4" />
-                        )}
-                        حضور القداس
-                      </button>
-                    )}
-                    {!hasServiceAttendance && (
-                      <button
-                        type="button"
-                        onClick={() => handleAddAttendance("SERVICE_ATTENDANCE")}
-                        disabled={!!addingAttendance}
-                        className="flex items-center gap-1.5 rounded-xl bg-coptic-gold-soft px-3 py-2 text-sm font-medium text-coptic-gold transition-colors hover:bg-coptic-gold-soft/70 disabled:opacity-50"
-                      >
-                        {addingAttendance === "SERVICE_ATTENDANCE" ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Plus className="size-4" />
-                        )}
-                        حضور الخدمة
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Attendance rows — always visible, clickable when empty */}
+              <div className="divide-y divide-border">
+                <AttendanceScoreRow
+                  label="حضور القداس"
+                  icon={<Church className="size-4" />}
+                  exists={hasChurchAttendance}
+                  points={scores.find((s) => s.category === "CHURCH_ATTENDANCE")?.points}
+                  loading={addingAttendance === "CHURCH_ATTENDANCE"}
+                  onAdd={() => setAttendanceConfirm("CHURCH_ATTENDANCE")}
+                />
+                <AttendanceScoreRow
+                  label="حضور الخدمة"
+                  icon={<Flame className="size-4" />}
+                  exists={hasServiceAttendance}
+                  points={scores.find((s) => s.category === "SERVICE_ATTENDANCE")?.points}
+                  loading={addingAttendance === "SERVICE_ATTENDANCE"}
+                  onAdd={() => setAttendanceConfirm("SERVICE_ATTENDANCE")}
+                />
+              </div>
 
-              {scores.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  لسه مفيش درجات مسجلة
-                </p>
-              ) : (
+              {/* Other scores */}
+              {scores.filter((s) => s.category !== "CHURCH_ATTENDANCE" && s.category !== "SERVICE_ATTENDANCE").length === 0 ? null : (
                 <div className="divide-y divide-border">
-                  {scores.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                      <div>
-                        <p className="font-medium">
-                          {SCORING_CATEGORY_LABELS[s.category as ScoringCategory] ?? s.category}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatArabicDate(s.session_date)}
-                        </p>
+                  {scores
+                    .filter((s) => s.category !== "CHURCH_ATTENDANCE" && s.category !== "SERVICE_ATTENDANCE")
+                    .map((s) => (
+                      <div key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                        <div>
+                          <p className="font-medium">
+                            {SCORING_CATEGORY_LABELS[s.category as ScoringCategory] ?? s.category}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {formatArabicDate(s.session_date)}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-coptic-gold-soft px-3 py-1 font-bold text-coptic-gold">
+                          +{s.points}
+                        </span>
                       </div>
-                      <span className="rounded-full bg-coptic-gold-soft px-3 py-1 font-bold text-coptic-gold">
-                        +{s.points}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
@@ -440,7 +422,84 @@ export function AdminMemberView({
           </AlertDialogContent>
         </AlertDialog>
       ) : null}
+
+      {attendanceConfirm ? (
+        <AlertDialog open onOpenChange={() => setAttendanceConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-coptic-gold-soft text-coptic-gold">
+                {attendanceConfirm === "CHURCH_ATTENDANCE" ? (
+                  <Church className="size-6" />
+                ) : (
+                  <Flame className="size-6" />
+                )}
+              </AlertDialogMedia>
+              <AlertDialogTitle>
+                {attendanceConfirm === "CHURCH_ATTENDANCE" ? "إضافة حضور القداس" : "إضافة حضور الخدمة"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                سيتم تسجيل الدرجة بناءً على القاعدة الموجودة.هل أنت متأكد؟
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleAddAttendance(attendanceConfirm)}>
+                {addingAttendance ? <Loader2 className="size-4 animate-spin" /> : null}
+                تأكيد
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
     </div>
+  )
+}
+
+function AttendanceScoreRow({
+  label,
+  icon,
+  exists,
+  points,
+  loading,
+  onAdd,
+}: {
+  label: string
+  icon: React.ReactNode
+  exists: boolean
+  points?: number
+  loading: boolean
+  onAdd: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => !exists && !loading && onAdd()}
+      disabled={exists || loading}
+      className={cn(
+        "flex w-full items-center justify-between px-4 py-3 text-sm transition-colors",
+        exists
+          ? "cursor-default"
+          : "cursor-pointer hover:bg-secondary/50"
+      )}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-8 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+          {icon}
+        </span>
+        <p className="font-medium">{label}</p>
+      </div>
+      {loading ? (
+        <Loader2 className="size-4 animate-spin text-coptic-gold" />
+      ) : exists ? (
+        <span className="rounded-full bg-coptic-gold-soft px-3 py-1 font-bold text-coptic-gold">
+          +{points}
+        </span>
+      ) : (
+        <span className="rounded-full bg-coptic-gold-soft/60 px-3 py-1 text-xs font-medium text-coptic-gold/70">
+          اضغط للإضافة
+        </span>
+      )}
+    </button>
   )
 }
 
