@@ -20,7 +20,7 @@ export default async function SuperAdminHomePage() {
   const dayEnd = cairoDayEnd(now).toISOString()
   const today = cairoDateString(now)
 
-  const [members, servants, admins, todayAttendance, scoresToday, birthdays] = await Promise.all([
+  const [members, servants, admins, todayAttendance, scoresToday] = await Promise.all([
     supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -50,8 +50,14 @@ export default async function SuperAdminHomePage() {
       .from("score_records")
       .select("id", { count: "exact", head: true })
       .eq("session_date", today),
-    getUpcomingBirthdays(supabase, [ROLES.SUPER_ADMIN, ROLES.SERVED_MEMBER]),
   ])
+
+  let birthdays: Awaited<ReturnType<typeof getUpcomingBirthdays>> = []
+  try {
+    birthdays = await getUpcomingBirthdays(supabase, [ROLES.SUPER_ADMIN, ROLES.SERVED_MEMBER])
+  } catch {
+    // birthdays is optional — don't crash the dashboard
+  }
 
   const todayRecords = ((todayAttendance.data ?? []) as never[]) as {
     id: string
