@@ -9,6 +9,8 @@ import { AdminMemberView } from "@/components/app/admin-member-view"
 import { ResetPasswordButton } from "@/components/app/reset-password-button"
 import { adminUpdateProfileAction, adminUpdateStatusAction } from "@/app/actions/profile"
 import { NileDivider } from "@/components/coptic/brand"
+import { lastFridayOnOrBefore } from "@/lib/friday"
+import { cairoDateString } from "@/lib/cairo"
 
 export const metadata: Metadata = { title: "عرض مستخدم" }
 
@@ -87,6 +89,7 @@ export default async function SuperAdminUserDetailPage({
         memberClass={memberDetailResult.data?.class ?? null}
         onSubmit={adminUpdateProfileAction}
         onChangeStatus={adminUpdateStatusAction}
+        currentFriday={lastFridayOnOrBefore(cairoDateString(new Date()))}
       />
 
       <div className="flex items-center justify-center gap-2 rounded-2xl bg-card/60 py-3 text-xs text-muted-foreground">

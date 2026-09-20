@@ -2,13 +2,14 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil, X, QrCode, Star, MapPin, Phone, Calendar, User, Power, Archive, Loader2 } from "lucide-react"
+import { Pencil, X, QrCode, Star, MapPin, Phone, Calendar, User, Power, Archive, Loader2, Plus } from "lucide-react"
 import { cn } from "cn"
 import { QRCodeSVG } from "qrcode.react"
 import { toast } from "sonner"
 import { formatArabicDate, formatArabicDateTime } from "@/lib/dates"
 import { SCORING_CATEGORY_LABELS, type ScoringCategory } from "@/lib/constants"
 import type { Profile, UserStatus } from "@/lib/types"
+import { addManualAttendanceScoreAction } from "@/app/actions/scoring"
 import { AdminProfileEdit, type AdminProfileSubmit } from "./admin-profile-edit"
 import {
   AlertDialog,
@@ -31,6 +32,7 @@ type AdminMemberViewProps = {
   memberClass?: string | null
   onSubmit: AdminProfileSubmit
   onChangeStatus?: (id: string, status: UserStatus) => Promise<{ ok: boolean; message: string }>
+  currentFriday?: string | null
 }
 
 const STATUS_LABELS: Record<UserStatus, string> = {
@@ -48,12 +50,14 @@ export function AdminMemberView({
   memberClass,
   onSubmit,
   onChangeStatus,
+  currentFriday,
 }: AdminMemberViewProps) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [tab, setTab] = useState<"profile" | "attendance" | "scores">("profile")
   const [confirm, setConfirm] = useState<"INACTIVE" | "ARCHIVED" | "ACTIVE" | null>(null)
   const [pending, setPending] = useState(false)
+  const [addingAttendance, setAddingAttendance] = useState<"CHURCH_ATTENDANCE" | "SERVICE_ATTENDANCE" | null>(null)
 
   const handleStatus = async (status: UserStatus) => {
     if (!onChangeStatus) return
@@ -68,6 +72,29 @@ export function AdminMemberView({
       toast.error(result.message)
     }
   }
+
+  const handleAddAttendance = async (category: "CHURCH_ATTENDANCE" | "SERVICE_ATTENDANCE") => {
+    if (!currentFriday) {
+      toast.error("لا يوجد جمعة حالية")
+      return
+    }
+    setAddingAttendance(category)
+    const res = await addManualAttendanceScoreAction({
+      profileId: profile.id,
+      category,
+      sessionDate: currentFriday,
+    })
+    setAddingAttendance(null)
+    if (res.ok) {
+      toast.success(res.message)
+      router.refresh()
+    } else {
+      toast.error(res.message)
+    }
+  }
+
+  const hasChurchAttendance = scores.some((s) => s.category === "CHURCH_ATTENDANCE")
+  const hasServiceAttendance = scores.some((s) => s.category === "SERVICE_ATTENDANCE")
 
   const confirmDialog =
     confirm === "ARCHIVED" ? (
@@ -311,6 +338,46 @@ export function AdminMemberView({
               <div className="border-b border-border px-4 py-3">
                 <p className="font-heading font-bold">الدرجات</p>
               </div>
+
+              {/* Add missing attendance scores */}
+              {(!hasChurchAttendance || !hasServiceAttendance) && (
+                <div className="space-y-2 border-b border-border px-4 py-3">
+                  <p className="text-[11px] text-muted-foreground">إضافة درجة حضور يدوياً</p>
+                  <div className="flex flex-wrap gap-2">
+                    {!hasChurchAttendance && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddAttendance("CHURCH_ATTENDANCE")}
+                        disabled={!!addingAttendance}
+                        className="flex items-center gap-1.5 rounded-xl bg-coptic-gold-soft px-3 py-2 text-sm font-medium text-coptic-gold transition-colors hover:bg-coptic-gold-soft/70 disabled:opacity-50"
+                      >
+                        {addingAttendance === "CHURCH_ATTENDANCE" ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Plus className="size-4" />
+                        )}
+                        حضور القداس
+                      </button>
+                    )}
+                    {!hasServiceAttendance && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddAttendance("SERVICE_ATTENDANCE")}
+                        disabled={!!addingAttendance}
+                        className="flex items-center gap-1.5 rounded-xl bg-coptic-gold-soft px-3 py-2 text-sm font-medium text-coptic-gold transition-colors hover:bg-coptic-gold-soft/70 disabled:opacity-50"
+                      >
+                        {addingAttendance === "SERVICE_ATTENDANCE" ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Plus className="size-4" />
+                        )}
+                        حضور الخدمة
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {scores.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                   لسه مفيش درجات مسجلة

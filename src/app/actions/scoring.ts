@@ -8,9 +8,18 @@ import {
   grantMonthlyActivity,
   getWeeklyEntryState,
   saveWeeklyScores,
+  getActiveScoringRules,
+  rulesByCategory,
   ScoreError,
   type WeeklyEntryState,
 } from "@/services/scoring-service"
+import {
+  categoryPeriodKind,
+  periodForDate,
+  toDateString,
+} from "@/services/scoring-rules"
+import { type ScoringCategory } from "@/lib/constants"
+import { logAudit } from "@/services/auth-service"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -130,4 +139,82 @@ export async function grantMonthlyActivityAction(input: {
   } catch (err) {
     return wrap(err)
   }
+}
+
+export type AddAttendanceScoreResult = { ok: boolean; message: string }
+
+/**
+ * Manually add an attendance score (CHURCH_ATTENDANCE or SERVICE_ATTENDANCE)
+ * using the fixed point value from scoring rules. Only adds if no score
+ * exists for that category in the same period.
+ */
+export async function addManualAttendanceScoreAction(input: {
+  profileId: string
+  category: "CHURCH_ATTENDANCE" | "SERVICE_ATTENDANCE"
+  sessionDate: string
+}): Promise<AddAttendanceScoreResult> {
+  const actor = await requireAdminActor()
+  if (!actor) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(input.profileId) || !isDateString(input.sessionDate)) {
+    return { ok: false, message: "بيانات غير صحيحة" }
+  }
+
+  const category = input.category as ScoringCategory
+  const admin = createAdminClient()
+
+  const rules = rulesByCategory(await getActiveScoringRules(admin, [category]))
+  const rule = rules[category as ScoringCategory]
+  if (!rule) {
+    return { ok: false, message: "لا توجد قاعدة نشطة لهذه الفئة" }
+  }
+
+  const points = Number(rule.point_value)
+  const kind = categoryPeriodKind(category)
+  const period = periodForDate(kind, input.sessionDate)
+  const sessionDate = toDateString(input.sessionDate)
+
+  const { data: existing } = await admin
+    .from("score_records")
+    .select("id")
+    .eq("profile_id", input.profileId)
+    .eq("category", category)
+    .eq("period_key", period.key)
+    .eq("is_voided", false)
+    .maybeSingle()
+
+  if (existing) {
+    return { ok: false, message: "يوجد درجة مسجلة بالفعل لهذه الفئة في نفس الفترة" }
+  }
+
+  const { data: inserted, error } = await admin
+    .from("score_records")
+    .insert({
+      profile_id: input.profileId,
+      category,
+      points,
+      rule_id: rule.id,
+      session_date: sessionDate,
+      recorded_by: actor.adminId,
+      period_key: period.key,
+    })
+    .select("id")
+    .single()
+
+  if (error) {
+    if (error.code === "23505") {
+      return { ok: false, message: "يوجد درجة مسجلة بالفعل لهذه الفئة" }
+    }
+    return { ok: false, message: "تعذر حفظ الدرجة" }
+  }
+
+  await logAudit(admin, {
+    actorId: actor.adminId,
+    action: "SCORE_CREATED",
+    entity: "SCORE",
+    entityId: inserted.id,
+    next: { points, category, period_key: period.key, profile_id: input.profileId },
+    metadata: { category, period_key: period.key, profile_id: input.profileId, points, manual_attendance: true },
+  })
+
+  return { ok: true, message: `تم إضافة ${points} نقطة ✓` }
 }

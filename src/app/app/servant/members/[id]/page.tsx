@@ -7,6 +7,8 @@ import { getProfile, getProfileById } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { AdminMemberView } from "@/components/app/admin-member-view"
 import { adminUpdateProfileAction, adminUpdateStatusAction } from "@/app/actions/profile"
+import { lastFridayOnOrBefore } from "@/lib/friday"
+import { cairoDateString } from "@/lib/cairo"
 
 export const metadata: Metadata = { title: "عرض عضو" }
 
@@ -82,6 +84,7 @@ export default async function ServantMemberDetailPage({
         memberClass={memberDetailResult.data?.class ?? null}
         onSubmit={adminUpdateProfileAction}
         onChangeStatus={adminUpdateStatusAction}
+        currentFriday={lastFridayOnOrBefore(cairoDateString(new Date()))}
       />
     </div>
   )
