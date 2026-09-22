@@ -1,30 +1,39 @@
 "use client"
 
-import { useCallback, useState } from "react"
-import { CalendarCheck, Check, ChevronDown, Loader2, Users } from "lucide-react"
+import { useCallback, useMemo, useState } from "react"
+import { CalendarCheck, Check, ChevronDown, Loader2, Save, Users } from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
 import { formatArabicDate } from "@/lib/dates"
-import { getClassDeskAction, removeDeskAttendanceAction } from "@/app/actions/class-desk"
-import { markServantAttendanceOnBehalfAction } from "@/app/actions/attendance"
+import { getClassDeskAction, saveClassDeskAction } from "@/app/actions/class-desk"
 import { ServantActivityPanel } from "@/components/app/servant-activity-panel"
-import { ServantScoringBoard } from "@/components/app/servant-scoring-board"
-import type { ClassDeskData, DeskServant } from "@/services/class-desk-service"
+import {
+  ServantScoringBoard,
+  type BoardDraftState,
+} from "@/components/app/servant-scoring-board"
+import type {
+  ClassDeskData,
+  DeskServant,
+  DeskSaveInput,
+} from "@/services/class-desk-service"
+import type { ServantDayData } from "@/services/servant-day-service"
 
 type ClassOption = { id: string; name: string }
+type ActivityDraftMap = Record<string, Record<string, Record<string, boolean>>>
 
 /**
- * Super Admin class desk — one screen for one class:
+ * Super Admin class desk — one screen for one class, draft-then-save:
  *
  *  - Class dropdown selects the class being worked on.
  *  - "خدام الصف": every active servant of the class with their today's
- *    attendance (record / remove on behalf) and an expandable activities
- *    panel (record SERVANT activities on behalf).
- *  - "مخدومين الصف": the shared scoring board scoped to the class — check
- *    what wasn't recorded yet and add attendance/scores manually.
+ *    attendance toggle and an expandable activities panel. Everything is a
+ *    local draft — nothing is written on tap.
+ *  - "مخدومين الصف": the shared class-scoped scoring board in draft mode
+ *    (attendance + scores are collected locally too).
+ *  - A single "حفظ" button persists all draft changes in one batch and
+ *    re-fetches the desk, so the page updates automatically.
  *
- * All writes go through super-admin-gated server actions; the desk re-fetches
- * the class payload from the server after every mutation.
+ * All writes go through the super-admin-gated `saveClassDeskAction`.
  */
 export function SuperAdminClassDesk({
   classes,
@@ -45,45 +54,194 @@ export function SuperAdminClassDesk({
   const [desk, setDesk] = useState<ClassDeskData | null>(initialDesk)
   const [loading, setLoading] = useState(false)
 
-  const reload = useCallback(async (id: string) => {
-    setLoading(true)
-    const res = await getClassDeskAction(id)
-    setLoading(false)
-    if (res.ok) {
-      setDesk(res.data)
-      setClassId(res.data.classId)
-    } else {
-      toast.error(res.message)
-    }
+  const [servantAttendance, setServantAttendance] = useState<Record<string, boolean>>({})
+  const [activityDrafts, setActivityDrafts] = useState<ActivityDraftMap>({})
+  const [boardDrafts, setBoardDrafts] = useState<BoardDraftState | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const resetDrafts = useCallback(() => {
+    setServantAttendance({})
+    setActivityDrafts({})
+    setBoardDrafts(null)
   }, [])
 
+  const reload = useCallback(
+    async (id: string) => {
+      setLoading(true)
+      const res = await getClassDeskAction(id)
+      setLoading(false)
+      if (res.ok) {
+        setDesk(res.data)
+        setClassId(res.data.classId)
+      } else {
+        toast.error(res.message)
+      }
+    },
+    []
+  )
+
   const handleClassChange = (value: string) => {
-    if (!value) return
+    if (!value || value === classId) return
+    resetDrafts()
+    setRefreshKey((k) => k + 1)
     void reload(value)
   }
 
-  const handleAttendance = async (servant: DeskServant) => {
-    setLoading(true)
-    const res = await markServantAttendanceOnBehalfAction(servant.profileId)
-    setLoading(false)
-    if (res.status === "success") {
-      toast.success(`تم تسجيل حضور ${servant.fullName}`)
-    } else if (res.status === "duplicate") {
-      toast.info("تم تسجيل الحضور بالفعل")
+  /** Server-truth presence for a servant (today). */
+  const serverPresent = useCallback(
+    (servant: DeskServant) => servant.day.todayAttendance.length > 0,
+    []
+  )
+
+  /** Effective presence = draft if present, else server truth. */
+  const effectivePresent = (servant: DeskServant): boolean => {
+    const draft = servantAttendance[servant.profileId]
+    if (draft !== undefined) return draft
+    return serverPresent(servant)
+  }
+
+  /** History with activity drafts merged → passed to each servant's panel. */
+  const effectiveHistory = (servant: DeskServant): ServantDayData["history"] => {
+    const base = servant.day.history
+    const drafts = activityDrafts[servant.profileId]
+    if (!drafts) return base
+
+    const overridden = new Set<string>()
+    const out: ServantDayData["history"] = []
+    for (const h of base) {
+      const key = `${h.activityId}|${h.recordedOn}`
+      const val = drafts[h.recordedOn]?.[h.activityId]
+      if (val === undefined) out.push(h)
+      else if (val === true) out.push(h)
+      overridden.add(key)
+    }
+    for (const [date, acts] of Object.entries(drafts)) {
+      for (const [activityId, val] of Object.entries(acts)) {
+        if (val === true && !overridden.has(`${activityId}|${date}`)) {
+          out.push({ activityId, recordedOn: date })
+        }
+      }
+    }
+    return out
+  }
+
+  const toggleServantAttendance = (servant: DeskServant) => {
+    const current = effectivePresent(servant)
+    const next = !current
+    if (next === serverPresent(servant)) {
+      setServantAttendance((prev) => {
+        const nextMap = { ...prev }
+        delete nextMap[servant.profileId]
+        return nextMap
+      })
+    } else {
+      setServantAttendance((prev) => ({ ...prev, [servant.profileId]: next }))
+    }
+  }
+
+  const handleActivityToggle = (
+    servant: DeskServant,
+    activityId: string,
+    recorded: boolean,
+    date: string
+  ) => {
+    const serverRecorded = servant.day.history.some(
+      (h) => h.activityId === activityId && h.recordedOn === date
+    )
+    const nextVal = !recorded
+    if (nextVal === serverRecorded) {
+      setActivityDrafts((prev) => {
+        const nextMap = { ...prev }
+        if (!nextMap[servant.profileId]?.[date]) return prev
+        const rows = { ...nextMap[servant.profileId][date] }
+        delete rows[activityId]
+        if (Object.keys(rows).length === 0) {
+          const dates = { ...nextMap[servant.profileId] }
+          delete dates[date]
+          if (Object.keys(dates).length === 0) delete nextMap[servant.profileId]
+          else nextMap[servant.profileId] = dates
+        } else {
+          nextMap[servant.profileId] = {
+            ...nextMap[servant.profileId],
+            [date]: rows,
+          }
+        }
+        return nextMap
+      })
+      return
+    }
+    setActivityDrafts((prev) => ({
+      ...prev,
+      [servant.profileId]: {
+        ...(prev[servant.profileId] ?? {}),
+        [date]: { ...(prev[servant.profileId]?.[date] ?? {}), [activityId]: nextVal },
+      },
+    }))
+  }
+
+  const boardDirty =
+    (boardDrafts?.attendance.length ?? 0) > 0 || (boardDrafts?.scores.length ?? 0) > 0
+  const attendanceDirty = Object.keys(servantAttendance).length > 0
+  const activityDirty = Object.keys(activityDrafts).length > 0
+  const hasChanges = attendanceDirty || activityDirty || boardDirty
+
+  const handleSave = async () => {
+    if (!classId || saving) return
+    if (!hasChanges) return
+
+    const servantActivities: DeskSaveInput["servantActivities"] = []
+    for (const [servantId, dates] of Object.entries(activityDrafts)) {
+      for (const [date, acts] of Object.entries(dates)) {
+        for (const [activityId, recorded] of Object.entries(acts)) {
+          if (typeof recorded !== "boolean") continue
+          servantActivities.push({ servantId, date, activityId, recorded })
+        }
+      }
+    }
+
+    const payload: DeskSaveInput = {
+      classId,
+      date: today,
+      servantAttendance: Object.entries(servantAttendance).map(([profileId, present]) => ({
+        profileId,
+        present,
+      })),
+      servantActivities,
+      memberAttendance: boardDrafts?.attendance ?? [],
+      memberScores: boardDrafts?.scores ?? [],
+    }
+
+    setSaving(true)
+    const res = await saveClassDeskAction(payload)
+    setSaving(false)
+
+    if (res.ok) {
+      toast.success(res.message)
+      resetDrafts()
+      setRefreshKey((k) => k + 1)
+      void reload(classId)
     } else {
       toast.error(res.message)
     }
-    if (classId) void reload(classId)
   }
 
-  const handleRemoveAttendance = async (recordId: string, name: string) => {
-    setLoading(true)
-    const res = await removeDeskAttendanceAction(recordId)
-    setLoading(false)
-    if (res.ok) toast.success(`تم حذف حضور ${name}`)
-    else toast.error(res.message)
-    if (classId) void reload(classId)
-  }
+  const totalChanges = useMemo(
+    () =>
+      Object.keys(servantAttendance).length +
+      Object.values(activityDrafts).reduce(
+        (s, dates) =>
+          s +
+          Object.values(dates).reduce(
+            (s2, acts) => s2 + Object.values(acts).filter(Boolean).length,
+            0
+          ),
+        0
+      ) +
+      (boardDrafts?.attendance.length ?? 0) +
+      (boardDrafts?.scores.length ?? 0),
+    [servantAttendance, activityDrafts, boardDrafts]
+  )
 
   if (classes.length === 0) {
     return (
@@ -152,21 +310,19 @@ export function SuperAdminClassDesk({
                     servant={servant}
                     today={today}
                     minDate={minDate}
-                    busy={loading}
-                    onRecordAttendance={() => void handleAttendance(servant)}
-                    onRemoveAttendance={(recordId) =>
-                      void handleRemoveAttendance(recordId, servant.fullName)
+                    present={effectivePresent(servant)}
+                    history={effectiveHistory(servant)}
+                    onToggleAttendance={() => toggleServantAttendance(servant)}
+                    onActivityToggle={(activityId, recorded, date) =>
+                      handleActivityToggle(servant, activityId, recorded, date)
                     }
-                    onActivitiesChanged={() => {
-                      if (classId) void reload(classId)
-                    }}
                   />
                 ))}
               </div>
             )}
           </section>
 
-          {/* Served members of the class — shared class-scoped board */}
+          {/* Served members of the class — shared class-scoped board (draft mode) */}
           <section aria-label="مخدومين الصف" className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-heading font-bold">مخدومين الصف</h2>
@@ -176,14 +332,56 @@ export function SuperAdminClassDesk({
             </div>
 
             <ServantScoringBoard
+              key={`${desk.classId}-${refreshKey}`}
               currentUserId={currentUserId}
               cairoToday={today}
               initialBoard={desk.board}
               classId={desk.classId}
               embedded
               allowRemoveAny
+              draftMode
+              onDraftsChange={setBoardDrafts}
             />
           </section>
+
+          {/* Sticky save bar */}
+          <div className="sticky bottom-3 z-10">
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-background/90 p-3 shadow-lg ring-1 ring-foreground/10 backdrop-blur">
+              <p className="text-xs text-muted-foreground">
+                {hasChanges ? (
+                  <>
+                    <span className="font-bold text-coptic-teal">{totalChanges}</span> تعديل غير محفوظ
+                  </>
+                ) : (
+                  "لا توجد تعديلات"
+                )}
+              </p>
+              <button
+                type="button"
+                data-testid="class-desk-save"
+                disabled={!hasChanges || saving || loading}
+                onClick={() => void handleSave()}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors sm:flex-none sm:min-w-44",
+                  hasChanges
+                    ? "bg-coptic-teal text-primary-foreground hover:opacity-90"
+                    : "cursor-default bg-muted text-muted-foreground"
+                )}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    جاري الحفظ…
+                  </>
+                ) : (
+                  <>
+                    <Save className="size-4" />
+                    حفظ التعديلات
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </>
       ) : null}
     </div>
@@ -194,25 +392,24 @@ function ServantDeskCard({
   servant,
   today,
   minDate,
-  busy,
-  onRecordAttendance,
-  onRemoveAttendance,
-  onActivitiesChanged,
+  present,
+  history,
+  onToggleAttendance,
+  onActivityToggle,
 }: {
   servant: DeskServant
   today: string
   minDate: string
-  busy: boolean
-  onRecordAttendance: () => void
-  onRemoveAttendance: (recordId: string) => void
-  onActivitiesChanged: () => void
+  present: boolean
+  history: ServantDayData["history"]
+  onToggleAttendance: () => void
+  onActivityToggle: (activityId: string, recorded: boolean, date: string) => void
 }) {
-  const todayAttendance = servant.day.todayAttendance
-  const present = todayAttendance.length > 0
-  const latest = todayAttendance[0] ?? null
-
   return (
-    <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
+    <div
+      data-testid={`servant-desk-card-${servant.profileId}`}
+      className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5"
+    >
       <div className="flex items-center gap-3">
         <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-coptic-teal font-heading font-bold text-primary-foreground">
           {servant.fullName.trim().charAt(0)}
@@ -224,27 +421,21 @@ function ServantDeskCard({
           </p>
         </div>
 
-        {present && latest ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onRemoveAttendance(latest.id)}
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-coptic-teal/10 px-3 py-1.5 text-xs font-bold text-coptic-teal transition-colors hover:bg-coptic-teal/20"
-          >
-            <Check className="size-3.5" />
-            حاضر — اضغط لإلغاء
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onRecordAttendance}
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-coptic-teal px-3 py-1.5 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            <CalendarCheck className="size-3.5" />
-            سجّل حضور
-          </button>
-        )}
+        <button
+          type="button"
+          data-testid={`servant-desk-attendance-${servant.profileId}`}
+          onClick={onToggleAttendance}
+          aria-pressed={present}
+          className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors",
+            present
+              ? "bg-coptic-teal/10 text-coptic-teal ring-1 ring-coptic-teal/30 hover:bg-coptic-teal/20"
+              : "bg-coptic-teal text-primary-foreground hover:opacity-90"
+          )}
+        >
+          <Check className="size-3.5" />
+          {present ? "حاضر — اضغط للإلغاء" : "سجّل حضور"}
+        </button>
       </div>
 
       <details
@@ -261,11 +452,12 @@ function ServantDeskCard({
         <div className="px-3 pb-3">
           <ServantActivityPanel
             activities={servant.day.activities}
-            history={servant.day.history}
+            history={history}
             cairoToday={today}
             minDate={minDate}
             servantId={servant.profileId}
-            onChanged={onActivitiesChanged}
+            draftMode
+            onDraftToggle={onActivityToggle}
           />
         </div>
       </details>

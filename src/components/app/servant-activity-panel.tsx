@@ -34,6 +34,10 @@ type ServantActivityPanelProps = {
   servantId?: string
   /** Read-only view (servant self): records are made by the super admin only. */
   readOnly?: boolean
+  /** Draft model: toggles only call onDraftToggle and never write to the server.
+   * The parent passes an already-effective `history` and persists later. */
+  draftMode?: boolean
+  onDraftToggle?: (activityId: string, recorded: boolean, date: string) => void
   /** Called after a successful record/undo so the parent can refresh the history. */
   onChanged?: () => void
 }
@@ -64,6 +68,8 @@ export function ServantActivityPanel({
   minDate,
   servantId,
   readOnly = false,
+  draftMode = false,
+  onDraftToggle,
   onChanged,
 }: ServantActivityPanelProps) {
   const [date, setDate] = useState(cairoToday)
@@ -81,6 +87,10 @@ export function ServantActivityPanel({
   function toggle(activityId: string, recorded: boolean) {
     if (readOnly) return
     if (!recorded && date > cairoToday) return
+    if (draftMode) {
+      onDraftToggle?.(activityId, recorded, date)
+      return
+    }
     setBusyId(activityId)
     startTransition(async () => {
       const result = recorded
@@ -170,7 +180,11 @@ export function ServantActivityPanel({
         })}
       </div>
 
-      {readOnly ? (
+      {draftMode ? (
+        <p className="text-[11px] text-coptic-teal">
+          تعديلات مؤقتة — احفظ من زر الحفظ في نهاية الصفحة
+        </p>
+      ) : readOnly ? (
         <p className="text-[11px] text-muted-foreground">
           أنشطة الخدام تُسجَّل من مسؤول الخدمة فقط — يمكنك متابعة مشاركاتك من هنا
         </p>

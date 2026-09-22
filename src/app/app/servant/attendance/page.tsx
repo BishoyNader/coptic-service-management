@@ -13,6 +13,7 @@ import { getServerNow } from "@/services/attendance-service"
 import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
 import { getActiveStudyYear } from "@/services/study-year-service"
 import { getActiveScoringRules } from "@/services/scoring-service"
+import { getServantClassId } from "@/services/member-scoring-service"
 import { currentFridayIn } from "@/lib/friday"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceCheckIn } from "@/components/app/attendance-check-in"
@@ -33,6 +34,12 @@ export default async function ServantAttendancePage({ searchParams }: Props) {
   const params = await searchParams
   const admin = createAdminClient()
   const now = getServerNow()
+
+  const myClassId = await getServantClassId(admin, profile.id)
+  const { data: myClass } = myClassId
+    ? await admin.from("classes").select("name").eq("id", myClassId).maybeSingle()
+    : { data: null }
+  const myClassName = (myClass?.name as string | null | undefined) ?? null
 
   // Study year + schedule
   const studyYear = await getActiveStudyYear(admin, cairoDateString(now))
@@ -90,6 +97,11 @@ export default async function ServantAttendancePage({ searchParams }: Props) {
         <div>
           <h1 className="font-heading text-xl font-extrabold">تسجيل حضور</h1>
           <p className="text-sm text-muted-foreground">قاعةُ الخدمة</p>
+          {myClassName && (
+            <span className="mt-1.5 inline-block rounded-full bg-coptic-teal/10 px-3 py-1 text-xs font-bold text-coptic-teal">
+              صفّك: {myClassName}
+            </span>
+          )}
         </div>
         {schedule.length > 0 && (
           <FridayPicker schedule={schedule} selected={selectedFriday} />

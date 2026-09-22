@@ -53,6 +53,15 @@ const ICONS: Record<string, LucideIcon> = {
 
 type Board = ScoringBoardData
 
+/** One change the board wants persisted (draft mode) — a merge of attendance
+ * and score deltas relative to the server-truth board. */
+export type BoardDraftAttendanceEntry = { memberId: string; type: AttendanceType; present: boolean }
+export type BoardDraftScoreEntry = { memberId: string; activityId: string; points: number }
+export type BoardDraftState = {
+  attendance: BoardDraftAttendanceEntry[]
+  scores: BoardDraftScoreEntry[]
+}
+
 function cairoDaysAgo(days: number): string {
   const d = new Date(Date.now() - days * 86_400_000)
   return new Intl.DateTimeFormat("en-CA", {
@@ -64,6 +73,46 @@ function cairoDaysAgo(days: number): string {
 }
 
 const ATTENDANCE_TYPES: AttendanceType[] = ["CHURCH", "SERVICE"]
+
+/** Resolves draft encoded value ("" cleared input) back to a number. */
+function draftNumber(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === "") return fallback
+  const n = Number(raw)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : fallback
+}
+
+/** Builds the change-list the desk passes to the batch save action. */
+function buildBoardDraftState(
+  board: Board,
+  attDrafts: Record<string, Record<string, boolean>>,
+  scoreDrafts: Record<string, Record<string, string>>
+): BoardDraftState {
+  const attendance: BoardDraftAttendanceEntry[] = []
+  for (const m of board.members) {
+    for (const type of ATTENDANCE_TYPES) {
+      const draft = attDrafts[m.id]?.[type]
+      if (draft === undefined) continue
+      const server = !!m.attendance.find((a) => a.type === type)
+      if (draft === server) continue
+      attendance.push({ memberId: m.id, type, present: draft })
+    }
+  }
+
+  const scores: BoardDraftScoreEntry[] = []
+  for (const m of board.members) {
+    for (const activity of board.activities) {
+      const raw = scoreDrafts[m.id]?.[activity.id]
+      if (raw === undefined) continue
+      const existing = m.scores.find((s) => s.activity_id === activity.id)?.points ?? 0
+      const desired = draftNumber(raw, existing)
+      if (desired !== existing) {
+        scores.push({ memberId: m.id, activityId: activity.id, points: desired })
+      }
+    }
+  }
+
+  return { attendance, scores }
+}
 
 /**
  * Servant unified scoring board — ONE tab/screen for every active served
@@ -85,6 +134,8 @@ export function ServantScoringBoard({
   embedded = false,
   allowRemoveAny = false,
   classId,
+  draftMode = false,
+  onDraftsChange,
 }: {
   currentUserId: string
   cairoToday: string
@@ -95,6 +146,11 @@ export function ServantScoringBoard({
   allowRemoveAny?: boolean
   /** Optional class scope to pass through to the board action (super admin desks). */
   classId?: string
+  /** Draft model: attendance toggles + score edits only update local state and
+   * are reported via onDraftsChange; nothing writes to the server. A parent
+   * persists them in one save and re-mounts with a fresh board. */
+  draftMode?: boolean
+  onDraftsChange?: (drafts: BoardDraftState) => void
 }) {
   const [tab, setTab] = useState<"today" | "history">("today")
 
@@ -104,12 +160,16 @@ export function ServantScoringBoard({
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({})
+  const [attendanceDrafts, setAttendanceDrafts] = useState<
+    Record<string, Record<string, boolean>>
+  >({})
   const [busyAttendance, setBusyAttendance] = useState<{ memberId: string; type: AttendanceType } | null>(null)
   const [busyRemoveId, setBusyRemoveId] = useState<string | null>(null)
   const [savingMember, setSavingMember] = useState<string | null>(null)
   const [reloading, setReloading] = useState(false)
 
   const board = tab === "today" ? todayBoard : (historyBoard ?? todayBoard)
+  const todayDraftSource: Board = todayBoard ?? initialBoard
 
   const reloadToday = useCallback(async () => {
     setReloading(true)
@@ -155,15 +215,56 @@ export function ServantScoringBoard({
   const draftValue = (memberId: string, activityId: string, existing: number): string =>
     drafts[memberId]?.[activityId] ?? (existing === 0 ? "0" : String(existing))
 
+  const emitBoardChanges = useCallback(
+    (attDrafts: typeof attendanceDrafts, scoreDrafts: typeof drafts) => {
+      if (!draftMode || !onDraftsChange) return
+      onDraftsChange(buildBoardDraftState(todayDraftSource, attDrafts, scoreDrafts))
+    },
+    [draftMode, onDraftsChange, todayDraftSource]
+  )
+
   const setDraft = (memberId: string, activityId: string, value: string) => {
-    setDrafts((d) => ({
-      ...d,
-      [memberId]: { ...(d[memberId] ?? {}), [activityId]: value },
-    }))
+    const next = {
+      ...drafts,
+      [memberId]: { ...(drafts[memberId] ?? {}), [activityId]: value },
+    }
+    setDrafts(next)
+    if (draftMode) emitBoardChanges(attendanceDrafts, next)
+  }
+
+  /** Effective presence for a member+type = draft if set, else server truth. */
+  const effectivePresent = (member: ScoringBoardMember, type: AttendanceType): boolean => {
+    const draft = attendanceDrafts[member.id]?.[type]
+    if (draft !== undefined) return draft
+    return member.attendance.some((a) => a.type === type)
   }
 
   const toggleAttendance = async (member: ScoringBoardMember, type: AttendanceType) => {
     if (tab !== "today") return
+
+    if (draftMode) {
+      const serverPresent = member.attendance.some((a) => a.type === type)
+      const draft = attendanceDrafts[member.id]?.[type]
+      const current = draft !== undefined ? draft : serverPresent
+      const next = !current
+
+      const nextMap: Record<string, Record<string, boolean>> = { ...attendanceDrafts }
+      if (next === serverPresent) {
+        // Back to the persisted state — drop the draft so nothing is saved.
+        if (nextMap[member.id]) {
+          const rows = { ...nextMap[member.id] }
+          delete rows[type]
+          if (Object.keys(rows).length === 0) delete nextMap[member.id]
+          else nextMap[member.id] = rows
+        }
+      } else {
+        nextMap[member.id] = { ...(nextMap[member.id] ?? {}), [type]: next }
+      }
+      setAttendanceDrafts(nextMap)
+      emitBoardChanges(nextMap, drafts)
+      return
+    }
+
     const record = member.attendance.find((a) => a.type === type)
     if (record) {
       if (
@@ -244,11 +345,14 @@ export function ServantScoringBoard({
           <MemberList
             board={board}
             editable
+            draftMode={draftMode}
             currentUserId={currentUserId}
             allowRemoveAny={allowRemoveAny}
             draftValue={draftValue}
             setDraft={setDraft}
             scoreFor={scoreFor}
+            attendanceDrafts={attendanceDrafts}
+            effectivePresent={effectivePresent}
             busyAttendance={busyAttendance}
             busyRemoveId={busyRemoveId}
             savingMember={savingMember}
@@ -311,11 +415,14 @@ export function ServantScoringBoard({
 function MemberList({
   board,
   editable,
+  draftMode = false,
   currentUserId,
   allowRemoveAny,
   draftValue,
   setDraft,
   scoreFor,
+  attendanceDrafts = {},
+  effectivePresent,
   busyAttendance,
   busyRemoveId,
   savingMember,
@@ -325,11 +432,14 @@ function MemberList({
 }: {
   board: Board
   editable: boolean
+  draftMode?: boolean
   currentUserId: string
   allowRemoveAny: boolean
   draftValue: (memberId: string, activityId: string, existing: number) => string
   setDraft: (memberId: string, activityId: string, value: string) => void
   scoreFor: (member: ScoringBoardMember, activityId: string) => number
+  attendanceDrafts?: Record<string, Record<string, boolean>>
+  effectivePresent?: (member: ScoringBoardMember, type: AttendanceType) => boolean
   busyAttendance: { memberId: string; type: AttendanceType } | null
   busyRemoveId: string | null
   savingMember: string | null
@@ -365,11 +475,14 @@ function MemberList({
           member={member}
           activities={board.activities}
           editable={editable}
+          draftMode={draftMode}
           currentUserId={currentUserId}
           allowRemoveAny={allowRemoveAny}
           draftValue={draftValue}
           setDraft={setDraft}
           scoreFor={scoreFor}
+          attendanceDrafts={attendanceDrafts}
+          effectivePresent={effectivePresent}
           busyAttendance={busyAttendance}
           busyRemoveId={busyRemoveId}
           savingMember={savingMember}
@@ -385,11 +498,14 @@ function MemberCard({
   member,
   activities,
   editable,
+  draftMode = false,
   currentUserId,
   allowRemoveAny,
   draftValue,
   setDraft,
   scoreFor,
+  attendanceDrafts = {},
+  effectivePresent,
   busyAttendance,
   busyRemoveId,
   savingMember,
@@ -399,11 +515,14 @@ function MemberCard({
   member: ScoringBoardMember
   activities: Board["activities"]
   editable: boolean
+  draftMode?: boolean
   currentUserId: string
   allowRemoveAny: boolean
   draftValue: (memberId: string, activityId: string, existing: number) => string
   setDraft: (memberId: string, activityId: string, value: string) => void
   scoreFor: (member: ScoringBoardMember, activityId: string) => number
+  attendanceDrafts?: Record<string, Record<string, boolean>>
+  effectivePresent?: (member: ScoringBoardMember, type: AttendanceType) => boolean
   busyAttendance: { memberId: string; type: AttendanceType } | null
   busyRemoveId: string | null
   savingMember: string | null
@@ -422,6 +541,13 @@ function MemberCard({
   const churchActivities = activities.filter((a) => a.attendance_type === "CHURCH")
   const serviceActivities = activities.filter((a) => a.attendance_type === "SERVICE")
   const generalActivities = activities.filter((a) => !a.attendance_type)
+
+  const presentFor = (type: AttendanceType): boolean => {
+    if (effectivePresent) return effectivePresent(member, type)
+    const draft = attendanceDrafts[member.id]?.[type]
+    if (draft !== undefined) return draft
+    return member.attendance.some((a) => a.type === type)
+  }
 
   return (
     <div
@@ -443,8 +569,9 @@ function MemberCard({
       {/* Attendance sections with related activities */}
       {ATTENDANCE_TYPES.map((type) => {
         const record = member.attendance.find((a) => a.type === type) ?? null
+        const present = presentFor(type)
         const removable =
-          record !== null && (record.recordedBy === currentUserId || allowRemoveAny)
+          !draftMode && record !== null && (record.recordedBy === currentUserId || allowRemoveAny)
         const chipBusy = busy && busyAttendance!.type === type
         const removeBusy = busyRemoveId === record?.id
         const relatedActivities = type === "CHURCH" ? churchActivities : serviceActivities
@@ -455,11 +582,11 @@ function MemberCard({
               type="button"
               disabled={!editable || chipBusy || removeBusy}
               onClick={() => onToggleAttendance(member, type)}
-              aria-label={`${ATTENDANCE_TYPE_LABELS[type]} — ${member.full_name} — ${record ? "سُجل" : "لم يُسجَّل"}`}
+              aria-label={`${ATTENDANCE_TYPE_LABELS[type]} — ${member.full_name} — ${present ? "سُجل" : "لم يُسجَّل"}`}
               data-testid={`attendance-chip-${type}-${member.id}`}
               className={cn(
                 "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-medium transition-colors",
-                record
+                present
                   ? "border-coptic-teal/30 bg-coptic-teal/10 text-coptic-teal"
                   : "border-border bg-muted/40 text-muted-foreground",
                 !editable && "cursor-default",
@@ -469,20 +596,24 @@ function MemberCard({
               <span className="flex items-center gap-2">
                 {chipBusy || removeBusy ? (
                   <Loader2 className="size-4 animate-spin" />
-                ) : record ? (
+                ) : present ? (
                   <Check className="size-4" />
                 ) : (
                   <Clock className="size-4" />
                 )}
                 {ATTENDANCE_TYPE_LABELS[type]}
               </span>
-              <span className={cn("text-[10px]", record ? "font-bold" : "")}>
-                {record
-                  ? editable && removable
-                    ? `+${record.points} — اضغط للإلغاء`
-                    : `+${record.points}`
+              <span className={cn("text-[10px]", present ? "font-bold" : "")}>
+                {present
+                  ? draftMode && !record
+                    ? "+سيُسجَّل ✓"
+                    : editable && removable
+                      ? `+${record?.points ?? 0} — اضغط للإلغاء`
+                      : `+${record?.points ?? 0}`
                   : editable
-                    ? "اضغط للتسجيل"
+                    ? draftMode && record
+                      ? "اضغط للتراجع"
+                      : "اضغط للتسجيل"
                     : "غائب"}
               </span>
             </button>
@@ -532,7 +663,7 @@ function MemberCard({
         </p>
       )}
 
-      {editable ? (
+      {editable && !draftMode ? (
         <Button
           type="button"
           size="sm"
@@ -566,7 +697,8 @@ function ActivityInput({
 }) {
   const Icon = activity.icon ? ICONS[activity.icon] : ClipboardList
   const isCheckbox = activity.input_type === "checkbox"
-  const isChecked = existing > 0
+  const effective = draftNumber(draftValue(member.id, activity.id, existing), existing)
+  const isChecked = effective > 0
 
   return (
     <label

@@ -8,8 +8,11 @@ import { getServerNow } from "@/services/attendance-service"
 import { cairoDateString } from "@/lib/cairo"
 import { logAudit } from "@/services/auth-service"
 import {
+  applyDeskSave,
   getClassDeskData,
   type ClassDeskData,
+  type DeskSaveInput,
+  type DeskSaveSummary,
 } from "@/services/class-desk-service"
 import { removeDeskAttendanceRecord } from "@/services/attendance-service"
 
@@ -116,4 +119,84 @@ export async function adminSetServantClassAction(
   })
 
   return { ok: true, message: classId ? "تم تحديث صف الخادم ✓" : "تم إزالة الصف" }
+}
+
+// --- Batch save -------------------------------------------------------------
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** True for a real "YYYY-MM-DD" calendar date (rejects e.g. 2026-02-30). */
+function isRealDateString(value: string): boolean {
+  if (!DATE_RE.test(value)) return false
+  const [y, m, d] = value.split("-").map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
+const MAX_SERVANT_ROWS = 400
+const MAX_ACTIVITY_ROWS = 2000
+const MAX_MEMBER_ROWS = 400
+const MAX_SCORE_ROWS = 4000
+
+export type SaveClassDeskResult = { ok: boolean; message: string; summary?: DeskSaveSummary }
+
+/**
+ * Super Admin only: persists a whole class-desk draft in one call — servant
+ * attendance, servant activities, served-member attendance and served-member
+ * scores. Every write is validated + audited, individual failures are counted,
+ * and the caller re-fetches the desk afterwards so the page reflects the save
+ * automatically.
+ */
+export async function saveClassDeskAction(input: DeskSaveInput): Promise<SaveClassDeskResult> {
+  const actorId = await requireSuperAdmin()
+  if (!actorId) return { ok: false, message: "غير مصرح" }
+  if (!input || !isUuid(input.classId)) return { ok: false, message: "الصف غير صحيح" }
+  if (typeof input.date !== "string" || !isRealDateString(input.date)) {
+    return { ok: false, message: "التاريخ غير صحيح" }
+  }
+  if (input.date > cairoDateString(getServerNow())) {
+    return { ok: false, message: "لا يمكن الحفظ في تاريخ مستقبلي" }
+  }
+
+  const servantAttendance = (Array.isArray(input.servantAttendance) ? input.servantAttendance : [])
+    .filter((r) => r && isUuid(r.profileId) && typeof r.present === "boolean")
+    .slice(0, MAX_SERVANT_ROWS)
+
+  const servantActivities = (Array.isArray(input.servantActivities) ? input.servantActivities : [])
+    .filter(
+      (r) =>
+        r &&
+        isUuid(r.servantId) &&
+        isUuid(r.activityId) &&
+        isRealDateString(r.date) &&
+        typeof r.recorded === "boolean"
+    )
+    .slice(0, MAX_ACTIVITY_ROWS)
+
+  const memberAttendance = (Array.isArray(input.memberAttendance) ? input.memberAttendance : [])
+    .filter(
+      (r) =>
+        r &&
+        isUuid(r.memberId) &&
+        (r.type === "CHURCH" || r.type === "SERVICE") &&
+        typeof r.present === "boolean"
+    )
+    .slice(0, MAX_MEMBER_ROWS)
+
+  const memberScores = (Array.isArray(input.memberScores) ? input.memberScores : [])
+    .filter(
+      (r) => r && isUuid(r.memberId) && isUuid(r.activityId) && Number.isFinite(r.points)
+    )
+    .slice(0, MAX_SCORE_ROWS)
+
+  const summary = await applyDeskSave(createAdminClient(), actorId, {
+    classId: input.classId,
+    date: input.date,
+    servantAttendance,
+    servantActivities,
+    memberAttendance,
+    memberScores,
+  })
+
+  return { ok: summary.ok, message: summary.message, summary }
 }
