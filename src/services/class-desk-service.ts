@@ -31,14 +31,17 @@ async function listClassServants(
   admin: SupabaseAdminClient,
   classId: string
 ): Promise<{ id: string; full_name: string }[]> {
+  // The embedded `servants!inner(id)` select is required for the
+  // `servants.class_id` filter to be applied — PostgREST can only filter on a
+  // to-one relation that is present in the select list.
   const { data } = await admin
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, servants!inner(id)")
     .eq("role", ROLES.SERVANT)
     .eq("status", "ACTIVE")
     .eq("servants.class_id", classId)
     .order("full_name", { ascending: true })
-  return (data ?? []) as { id: string; full_name: string }[]
+  return (data ?? []) as unknown as { id: string; full_name: string }[]
 }
 
 export async function getClassDeskData(
