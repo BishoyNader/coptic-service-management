@@ -127,6 +127,7 @@ export async function recordAttendanceAction(
   const admin = createAdminClient()
   const outcome = await checkInByIdentifier(admin, {
     actorId: actor.actorId,
+    actorRole: actor.role,
     mode,
     identifier: identifier.trim(),
     type,
@@ -173,6 +174,7 @@ export async function manualAttendanceAction(
   const admin = createAdminClient()
   const outcome = await checkInByProfileId(admin, {
     actorId: actor.actorId,
+    actorRole: actor.role,
     profileId,
     type,
   })
@@ -221,6 +223,7 @@ export async function recordManualAttendanceAction(
   const admin = createAdminClient()
   const outcome = await recordManualAttendance(admin, {
     actorId: actor.actorId,
+    actorRole: actor.role,
     profileId,
     ruleId,
     sessionDate,
@@ -391,29 +394,25 @@ export async function loadTodayAttendanceByIds(
 }
 
 /**
- * Servant marks their own attendance with a single tap — no type selection,
- * no time-band scoring. Just "present".
+ * Super Admin only: marks a servant's attendance on their behalf with a single
+ * tap — no type selection, no time-band scoring. Just "present".
  */
-export async function markServantAttendanceAction(): Promise<RecordAttendanceResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { status: "error", message: "غير مصرح" }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  if (!profile || profile.role !== ROLES.SERVANT) {
-    return { status: "error", message: "هذه العملية للخدام فقط" }
+export async function markServantAttendanceOnBehalfAction(
+  servantId: string
+): Promise<RecordAttendanceResult> {
+  const actor = await requireAttendanceActor()
+  if (!actor) return { status: "error", message: "غير مصرح" }
+  if (actor.role !== ROLES.SUPER_ADMIN) {
+    return { status: "error", message: "حضور الخدام يُسجَّل من مسؤول الخدمة فقط" }
+  }
+  if (!isUuid(servantId)) {
+    return { status: "error", message: "بيانات غير صحيحة" }
   }
 
   const admin = createAdminClient()
   const outcome = await recordServantAttendance(admin, {
-    actorId: user.id,
+    actorId: actor.actorId,
+    subjectId: servantId,
   })
 
   if (outcome.status === "error") return outcome

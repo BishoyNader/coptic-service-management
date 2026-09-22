@@ -199,6 +199,8 @@ async function executeCheckIn(
   admin: SupabaseAdminClient,
   params: {
     actorId: string
+    /** Role of the authenticated actor — used to enforce who may record whom. */
+    actorRole: string
     person: AttendancePerson
     type: AttendanceType
     source: AttendanceSource
@@ -207,7 +209,7 @@ async function executeCheckIn(
     sessionDate?: string
   }
 ): Promise<CheckInOutcome> {
-  const { actorId, person, type, source, now } = params
+  const { actorId, actorRole, person, type, source, now } = params
   const cairoDate = params.sessionDate ?? cairoDateString(now)
 
   if (person.status !== "ACTIVE") {
@@ -215,6 +217,10 @@ async function executeCheckIn(
   }
   if (person.role !== "SERVED_MEMBER" && person.role !== "SERVANT") {
     return { status: "error", message: "هذا النوع من الحسابات لا يسجّل حضورًا" }
+  }
+  // Servant attendance is recorded from the super admin side only.
+  if (person.role === "SERVANT" && actorRole !== "SUPER_ADMIN") {
+    return { status: "error", message: "حضور الخدام يُسجَّل من مسؤول الخدمة فقط" }
   }
 
   if (!isCairoFriday(cairoDate)) {
@@ -398,12 +404,13 @@ export async function checkInByIdentifier(
   admin: SupabaseAdminClient,
   params: {
     actorId: string
+    actorRole: string
     mode: "QR" | "CODE"
     identifier: string
     type: AttendanceType
   }
 ): Promise<CheckInOutcome> {
-  const { actorId, mode, identifier, type } = params
+  const { actorId, actorRole, mode, identifier, type } = params
 
   if (mode === "CODE" && !/^[0-9]{6}$/.test(identifier)) {
     return { status: "error", message: "الكود يجب أن يكون 6 أرقام" }
@@ -419,6 +426,7 @@ export async function checkInByIdentifier(
 
   return executeCheckIn(admin, {
     actorId,
+    actorRole,
     person,
     type,
     source: mode === "QR" ? "QR" : "CODE",
@@ -429,14 +437,15 @@ export async function checkInByIdentifier(
 /** Admin/Super Admin manual attendance — the server still decides the time. */
 export async function checkInByProfileId(
   admin: SupabaseAdminClient,
-  params: { actorId: string; profileId: string; type: AttendanceType }
+  params: { actorId: string; actorRole: string; profileId: string; type: AttendanceType }
 ): Promise<CheckInOutcome> {
-  const { actorId, profileId, type } = params
+  const { actorId, actorRole, profileId, type } = params
   const person = await resolvePersonByProfileId(admin, profileId)
   if (!person) return { status: "error", message: "الشخص غير موجود" }
 
   return executeCheckIn(admin, {
     actorId,
+    actorRole,
     person,
     type,
     source: "MANUAL",
@@ -619,12 +628,13 @@ export async function recordChildAttendance(
   admin: SupabaseAdminClient,
   params: {
     actorId: string
+    actorRole: string
     memberId: string
     type: AttendanceType
     date: string
   }
 ): Promise<CheckInOutcome> {
-  const { actorId, memberId, type, date } = params
+  const { actorId, actorRole, memberId, type, date } = params
 
   const person = await resolvePersonByProfileId(admin, memberId)
   if (!person) return { status: "error", message: "الشخص غير موجود" }
@@ -644,6 +654,7 @@ export async function recordChildAttendance(
 
   return executeCheckIn(admin, {
     actorId,
+    actorRole,
     person,
     type,
     source: "MANUAL",
@@ -662,12 +673,13 @@ export async function recordManualAttendance(
   admin: SupabaseAdminClient,
   params: {
     actorId: string
+    actorRole: string
     profileId: string
     ruleId: string
     sessionDate: string
   }
 ): Promise<CheckInOutcome> {
-  const { actorId, profileId, ruleId, sessionDate } = params
+  const { actorId, actorRole, profileId, ruleId, sessionDate } = params
 
   const person = await resolvePersonByProfileId(admin, profileId)
   if (!person) return { status: "error", message: "الشخص غير موجود" }
@@ -711,6 +723,7 @@ export async function recordManualAttendance(
 
   return executeCheckIn(admin, {
     actorId,
+    actorRole,
     person,
     type,
     source: "MANUAL",
@@ -770,19 +783,24 @@ export async function removeServantChildAttendance(
 }
 
 /**
- * Servant marks their own attendance with a single tap — no type selection,
- * no time-band scoring. Uses CHURCH as the default internal type and records
+ * Records a servant's attendance with a single tap — no type selection, no
+ * time-band scoring. Uses CHURCH as the default internal type and records
  * the current instant. Points are always 0 for servants.
+ *
+ * `subjectId` defaults to `actorId` (self check-in) but lets a SUPER_ADMIN
+ * record the attendance of any active servant on their behalf. The actor is
+ * still captured as `recorded_by`.
  */
 export async function recordServantAttendance(
   admin: SupabaseAdminClient,
-  params: { actorId: string }
+  params: { actorId: string; subjectId?: string }
 ): Promise<CheckInOutcome> {
   const { actorId } = params
+  const subjectId = params.subjectId ?? actorId
   const now = getServerNow()
   const cairoDate = cairoDateString(now)
 
-  const person = await resolvePersonByProfileId(admin, actorId)
+  const person = await resolvePersonByProfileId(admin, subjectId)
   if (!person) return { status: "error", message: "الشخص غير موجود" }
   if (person.role !== ROLES.SERVANT) {
     return { status: "error", message: "هذه العملية للخدام فقط" }
@@ -799,7 +817,7 @@ export async function recordServantAttendance(
   const { data: existing } = await admin
     .from("attendance_records")
     .select("id, attended_at, points")
-    .eq("profile_id", actorId)
+    .eq("profile_id", subjectId)
     .eq("session_id", sessionId)
     .neq("status", "ARCHIVED")
     .maybeSingle()
@@ -818,7 +836,7 @@ export async function recordServantAttendance(
     "record_attendance_with_score",
     {
       p_session_id: sessionId,
-      p_profile_id: actorId,
+      p_profile_id: subjectId,
       p_attended_at: now.toISOString(),
       p_points: 0,
       p_recorded_by: actorId,
@@ -856,7 +874,7 @@ export async function recordServantAttendance(
     entity: "ATTENDANCE",
     entityId: result.id,
     metadata: {
-      profile_id: actorId,
+      profile_id: subjectId,
       subject_role: "SERVANT",
       attended_at: now.toISOString(),
       type: "CHURCH",
@@ -876,4 +894,44 @@ export async function recordServantAttendance(
     source: "MANUAL",
     points: 0,
   }
+}
+
+/**
+ * Super Admin class-desk cleanup: voids (removes) any attendance record —
+ * including a servant's — so a wrong entry can be dropped then re-recorded
+ * from the desk. The record is hard-deleted like the servant child path;
+ * the linked score cascade for members applies automatically.
+ */
+export async function removeDeskAttendanceRecord(
+  admin: SupabaseAdminClient,
+  params: { actorId: string; actorRole: string; recordId: string }
+): Promise<{ ok: boolean; message: string }> {
+  const { actorId, actorRole, recordId } = params
+  if (actorRole !== ROLES.SUPER_ADMIN) {
+    return { ok: false, message: "غير مصرح" }
+  }
+
+  const { data: row } = await admin
+    .from("attendance_records")
+    .select("id, profile_id")
+    .eq("id", recordId)
+    .maybeSingle()
+  if (!row) return { ok: false, message: "سجل الحضور غير موجود" }
+
+  const { error } = await admin.from("attendance_records").delete().eq("id", recordId)
+  if (error) return { ok: false, message: "تعذر حذف سجل الحضور" }
+
+  await logAudit(admin, {
+    actorId,
+    action: "ATTENDANCE_REMOVED",
+    entity: "ATTENDANCE",
+    entityId: recordId,
+    metadata: {
+      profile_id: row.profile_id,
+      removed_by: "DESK",
+      actor_role: actorRole,
+    },
+  })
+
+  return { ok: true, message: "تم حذف تسجيل الحضور" }
 }

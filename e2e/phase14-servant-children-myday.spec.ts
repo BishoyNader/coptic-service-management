@@ -283,26 +283,21 @@ test("Servant records SERVICE attendance for a past date", async ({ page }) => {
 })
 
 // ─── My-day hub ─────────────────────────────────────────────────────────────
-test("Hub own tab shows own attendance + records CHURCH + activities", async ({
-  page,
-}) => {
+test("Hub own tab shows read-only own attendance + activities", async ({ page }) => {
   await login(page, servant)
   await page.goto("/app/servant/activities")
   await page.waitForLoadState("networkidle")
   await expect(page.getByTestId("hub-tab-own")).toBeVisible()
   await expect(page.getByTestId("hub-tab-members")).toBeVisible()
-  await expect(page.getByTestId("my-day-attendance-card")).toHaveCount(2)
-
-  const churchCard = page
-    .locator("[data-testid='my-day-attendance-card']")
-    .filter({ hasText: "حضور القداس" })
-
-  const btn = churchCard.getByRole("button", { name: /سجّل/ })
-  if (await btn.isVisible()) {
-    await btn.click()
-  }
-  await expect(churchCard.getByText("تم تسجيله")).toBeVisible({ timeout: 10_000 })
+  // A servant's own day is read-only: status card without a self-record button.
+  await expect(page.getByTestId("my-day-attendance-card")).toHaveCount(1)
+  await expect(
+    page.getByTestId("my-day-attendance-card").getByText(/يُسجَّل من مسؤول الخدمة|لم يسجّل حضورك بعد|حاضر/)
+  ).toBeVisible()
+  await expect(page.getByTestId("my-day-attendance-card").getByRole("button")).toHaveCount(0)
   await expect(page.getByText("حضور آخر أسبوعين")).toBeVisible()
+  // Servant activity panel is read-only too — no "سجّل" affordance.
+  await expect(page.getByText("أنشطة الخدام تُسجَّل من مسؤول الخدمة فقط")).toBeVisible()
 })
 
 test("Hub own tab recent attendance section renders attendance items", async ({ page }) => {

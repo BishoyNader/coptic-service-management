@@ -7,7 +7,7 @@ import { ROLES } from "@/lib/roles"
 import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import { getServantDayData } from "@/services/servant-day-service"
-import { getScoringBoardData } from "@/services/member-scoring-service"
+import { getScoringBoardData, getServantClassId } from "@/services/member-scoring-service"
 import { ServantActivitiesHub, type HubServant } from "@/components/app/servant-activities-hub"
 
 export const metadata: Metadata = { title: "الأنشطة" }
@@ -32,6 +32,10 @@ export default async function ServantActivitiesPage() {
 
   const isSuperAdmin = profile.role === ROLES.SUPER_ADMIN
 
+  // Servant board scope: a classed servant sees only their class; unassigned
+  // servants (and super admins on this page) keep the all-members board.
+  let boardClassId: string | null | undefined = null
+
   let servants: HubServant[] = []
   let initialServantId: string | null = null
   let initialServerDay: Awaited<ReturnType<typeof getServantDayData>> | null = null
@@ -54,9 +58,10 @@ export default async function ServantActivitiesPage() {
   } else {
     initialServantId = profile.id
     initialServerDay = await getServantDayData(admin, profile.id, cairoToday, historySince)
+    boardClassId = await getServantClassId(admin, profile.id)
   }
 
-  const board = await getScoringBoardData(admin, cairoToday)
+  const board = await getScoringBoardData(admin, cairoToday, boardClassId ?? null)
 
   return (
     <div className="space-y-6">

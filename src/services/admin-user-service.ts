@@ -12,7 +12,10 @@ export type AdminCreateUserInput = {
   address?: string
   fatherPhone?: string
   motherPhone?: string
+  /** Free-text class name — kept for legacy/import flows. */
   class?: string
+  /** Schools/classes FK — standardized class linkage for both roles. */
+  classId?: string
 }
 
 export type AdminCreateUserResult =
@@ -38,7 +41,7 @@ export async function createAdminUser(
   actorId: string,
   input: AdminCreateUserInput
 ): Promise<AdminCreateUserResult> {
-  const { role, fullName, phone, password, dateOfBirth, address, fatherPhone, motherPhone, class: memberClass } = input
+  const { role, fullName, phone, password, dateOfBirth, address, fatherPhone, motherPhone, class: memberClass, classId } = input
   const normalizedPhone = normalizePhone(phone)
 
   const existing = await admin
@@ -89,10 +92,30 @@ export async function createAdminUser(
     return { ok: false, message: "تعذر حفظ البيانات، حاول مرة أخرى" }
   }
 
+  // Resolve the class FK (and keep the free-text name for legacy display on
+  // served members) before creating the detail row.
+  let resolvedClassName: string | null = null
+  if (classId) {
+    const { data: cls } = await admin
+      .from("classes")
+      .select("id, name, is_active")
+      .eq("id", classId)
+      .maybeSingle()
+    if (!cls || cls.is_active === false) {
+      return { ok: false, field: "classId", message: "الصف غير موجود" }
+    }
+    resolvedClassName = (cls.name as string) ?? null
+  }
+
   const detailTable = role === "SERVED_MEMBER" ? "served_members" : "servants"
   const detailRow: Record<string, unknown> = { profile_id: userId }
-  if (role === "SERVED_MEMBER" && memberClass) {
+  if (classId) {
+    detailRow.class_id = classId
+  } else if (role === "SERVED_MEMBER" && memberClass) {
     detailRow.class = memberClass
+  }
+  if (role === "SERVED_MEMBER" && (resolvedClassName ?? memberClass)) {
+    detailRow.class = resolvedClassName ?? memberClass
   }
   const { error: detailError } = await admin.from(detailTable).insert(detailRow)
 

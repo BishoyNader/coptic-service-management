@@ -79,31 +79,72 @@ export async function listGradedActivities(
   return (data ?? []) as GradedActivity[]
 }
 
-/** All active served members, ordered by name. */
+/** All active served members, ordered by name. When `classId` is given, only
+ * members of that class are returned. */
 export async function listActiveMembers(
-  admin: SupabaseAdminClient
+  admin: SupabaseAdminClient,
+  classId?: string | null
 ): Promise<{ id: string; full_name: string }[]> {
-  const { data } = await admin
+  const selectCols = classId
+    ? "id, full_name, served_members!inner(id)"
+    : "id, full_name"
+  let query = admin
     .from("profiles")
-    .select("id, full_name")
+    .select(selectCols)
     .eq("role", ROLES.SERVED_MEMBER)
     .eq("status", "ACTIVE")
-    .order("full_name", { ascending: true })
-  return (data ?? []) as { id: string; full_name: string }[]
+  if (classId) {
+    query = query.eq("served_members.class_id", classId)
+  }
+  const { data } = await query.order("full_name", { ascending: true })
+  return (data ?? []) as unknown as { id: string; full_name: string }[]
 }
 
 /**
- * Board payload for one Cairo day: active served members + their attendance
- * records for that day + their activity scores for that day + the graded
- * activity list.
+ * The authenticated servant's assigned class, if any. Returns `null` both when
+ * the servant has no class yet and when the row cannot be read — the caller
+ * decides what an unassigned servant may see.
+ */
+export async function getServantClassId(
+  admin: SupabaseAdminClient,
+  servantProfileId: string
+): Promise<string | null> {
+  const { data } = await admin
+    .from("servants")
+    .select("class_id")
+    .eq("profile_id", servantProfileId)
+    .maybeSingle()
+  return (data?.class_id as string | null | undefined) ?? null
+}
+
+/** True when the ACTIVE served member belongs to the given class. */
+export async function memberInClass(
+  admin: SupabaseAdminClient,
+  memberId: string,
+  classId: string
+): Promise<boolean> {
+  const { data } = await admin
+    .from("served_members")
+    .select("profile_id")
+    .eq("profile_id", memberId)
+    .eq("class_id", classId)
+    .maybeSingle()
+  return Boolean(data)
+}
+
+/**
+ * Board payload for one Cairo day: active served members (optionally scoped
+ * to a single class) + their attendance records for that day + their activity
+ * scores for that day + the graded activity list.
  */
 export async function getScoringBoardData(
   admin: SupabaseAdminClient,
-  date: string
+  date: string,
+  classId?: string | null
 ): Promise<ScoringBoardData> {
   const [activities, members, attendanceRows, scoreRows] = await Promise.all([
     listGradedActivities(admin),
-    listActiveMembers(admin),
+    listActiveMembers(admin, classId),
     admin
       .from("attendance_records")
       .select(

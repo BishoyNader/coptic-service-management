@@ -67,7 +67,7 @@ export function AdminUserForm({
   const [fatherPhone, setFatherPhone] = useState("")
   const [motherPhone, setMotherPhone] = useState("")
   const [address, setAddress] = useState("")
-  const [memberClass, setMemberClass] = useState("")
+  const [memberClassId, setMemberClassId] = useState("")
 
   const [errors, setErrors] = useState<FieldErrors>(newFieldErrors())
   const [generalError, setGeneralError] = useState<string | null>(null)
@@ -87,7 +87,7 @@ export function AdminUserForm({
     setFatherPhone("")
     setMotherPhone("")
     setAddress("")
-    setMemberClass("")
+    setMemberClassId("")
     setErrors(newFieldErrors())
     setGeneralError(null)
     setPending(false)
@@ -166,7 +166,7 @@ export function AdminUserForm({
       fatherPhone: fatherPhone || undefined,
       motherPhone: motherPhone || undefined,
       address: address || undefined,
-      memberClass: memberClass || undefined,
+      memberClassId: memberClassId || undefined,
     })
 
     setPending(false)
@@ -415,40 +415,29 @@ export function AdminUserForm({
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="au-memberClass">الصف (اختياري)</Label>
-                    <select
-                      id="au-memberClass"
-                      value={memberClass}
-                      onChange={(e) => setMemberClass(e.target.value)}
-                      className="flex h-11 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-                    >
-                      <option value="">بدون صنف</option>
-                      {classes.map((c) => (
-                        <option key={c.id} value={c.name}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <ClassSelect classes={classes} value={memberClassId} onChange={setMemberClassId} />
                 </>
               )}
 
               {step === 1 && !isMember && (
-                <div className="space-y-2">
-                  <Label htmlFor="au-dateOfBirth">تاريخ الميلاد (اختياري)</Label>
-                  <Input
-                    id="au-dateOfBirth"
-                    type="date"
-                    max={new Date().toISOString().split("T")[0]}
-                    value={dateOfBirth}
-                    onChange={(e) => setDateOfBirth(e.target.value)}
-                    className="h-11 text-base"
-                  />
-                  {errors.dateOfBirth ? (
-                    <p className="text-sm text-destructive">{errors.dateOfBirth}</p>
-                  ) : null}
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="au-dateOfBirth">تاريخ الميلاد (اختياري)</Label>
+                    <Input
+                      id="au-dateOfBirth"
+                      type="date"
+                      max={new Date().toISOString().split("T")[0]}
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      className="h-11 text-base"
+                    />
+                    {errors.dateOfBirth ? (
+                      <p className="text-sm text-destructive">{errors.dateOfBirth}</p>
+                    ) : null}
+                  </div>
+
+                  <ClassSelect classes={classes} value={memberClassId} onChange={setMemberClassId} />
+                </>
               )}
 
               {generalError ? (
@@ -499,5 +488,34 @@ export function AdminUserForm({
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ClassSelect({
+  classes,
+  value,
+  onChange,
+}: {
+  classes: { id: string; name: string }[]
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="au-memberClass">الصف (اختياري)</Label>
+      <select
+        id="au-memberClass"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex h-11 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+      >
+        <option value="">بدون صنف</option>
+        {classes.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+    </div>
   )
 }

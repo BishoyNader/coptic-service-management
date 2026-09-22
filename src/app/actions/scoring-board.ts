@@ -8,6 +8,8 @@ import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import {
   getScoringBoardData,
+  getServantClassId,
+  memberInClass,
   upsertMemberActivityScore,
   type ScoringBoardData,
 } from "@/services/member-scoring-service"
@@ -48,8 +50,19 @@ export type ScoringBoardResult =
   | { ok: true; board: ScoringBoardData }
   | { ok: false; message: string }
 
-/** Servant/super-admin unified board: all active members + their day's data. */
-export async function getScoringBoardAction(date: string): Promise<ScoringBoardResult> {
+/**
+ * Servant/super-admin unified board: active served members + their day's data.
+ *
+ * Class scoping:
+ *  - A SERVANT always sees their own class (resolved server-side). If they have
+ *    no class yet they keep the legacy "all members" scope. Passing a classId
+ *    that differs from their own class is rejected.
+ *  - A SUPER_ADMIN may scope to any class (`classId`) or see everyone (`null`).
+ */
+export async function getScoringBoardAction(
+  date: string,
+  classId?: string
+): Promise<ScoringBoardResult> {
   const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
   if (typeof date !== "string" || !isRealDateString(date)) {
@@ -58,7 +71,19 @@ export async function getScoringBoardAction(date: string): Promise<ScoringBoardR
   const cairoToday = cairoDateString(getServerNow())
   if (date > cairoToday) return { ok: false, message: "لا يمكن عرض تاريخ مستقبلي" }
 
-  const board = await getScoringBoardData(createAdminClient(), date)
+  const admin = createAdminClient()
+  let effectiveClass: string | null | undefined
+
+  if (actor.role === ROLES.SERVANT) {
+    effectiveClass = await getServantClassId(admin, actor.actorId)
+    if (classId && classId !== effectiveClass) {
+      return { ok: false, message: "غير مصرح" }
+    }
+  } else {
+    effectiveClass = classId ?? null
+  }
+
+  const board = await getScoringBoardData(admin, date, effectiveClass)
   return { ok: true, board }
 }
 
@@ -97,6 +122,17 @@ export async function saveMemberActivityScoresAction(
   }
 
   const admin = createAdminClient()
+
+  // A servant with an assigned class may only grade members of that class
+  // (the class-scoped board). Unassigned servants keep the legacy any-member
+  // scope.
+  if (actor.role === ROLES.SERVANT) {
+    const myClass = await getServantClassId(admin, actor.actorId)
+    if (myClass && !(await memberInClass(admin, input.memberId, myClass))) {
+      return { ok: false, saved: 0, failed: input.scores.length, message: "هذا المخدوم ليس من صفّك" }
+    }
+  }
+
   let saved = 0
   let failed = 0
 

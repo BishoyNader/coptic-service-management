@@ -17,6 +17,10 @@ import {
   recordChildAttendance,
   removeServantChildAttendance,
 } from "@/services/attendance-service"
+import {
+  getServantClassId,
+  memberInClass,
+} from "@/services/member-scoring-service"
 import type { AttendanceSource, AttendanceType } from "@/lib/types"
 
 const VALID_TYPES = Object.keys(ATTENDANCE_TYPE_LABELS) as AttendanceType[]
@@ -83,8 +87,20 @@ export async function recordChildAttendanceAction(
   }
 
   const admin = createAdminClient()
+
+  // A servant with an assigned class may only record attendance for members
+  // of that class (their class-scoped board). Unassigned servants keep the
+  // legacy any-member scope.
+  if (actor.role === ROLES.SERVANT) {
+    const myClass = await getServantClassId(admin, actor.actorId)
+    if (myClass && !(await memberInClass(admin, memberId, myClass))) {
+      return { ok: false, message: "هذا المخدوم ليس من صفّك" }
+    }
+  }
+
   const res = await recordChildAttendance(admin, {
     actorId: actor.actorId,
+    actorRole: actor.role,
     memberId,
     type,
     date,

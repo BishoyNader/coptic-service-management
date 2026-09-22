@@ -25,6 +25,7 @@ export type Profile = {
 export type ServedMember = {
   profile_id: string
   class: string | null
+  class_id: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -33,6 +34,7 @@ export type ServedMember = {
 export type Servant = {
   profile_id: string
   service_name: string | null
+  class_id: string | null
   notes: string | null
   created_at: string
   updated_at: string

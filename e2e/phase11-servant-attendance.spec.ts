@@ -588,6 +588,7 @@ test.describe("PHASE 11 — SERVANT attendance board", () => {
     // A SUPER_ADMIN target is never a valid attendance subject.
     const superOutcome = await checkInByProfileId(admin, {
       actorId: servantA.userId,
+      actorRole: "SERVANT",
       profileId: superSeed.userId,
       type: "CHURCH",
     })
@@ -599,6 +600,7 @@ test.describe("PHASE 11 — SERVANT attendance board", () => {
     // Inactive subjects are rejected before any session is created.
     const inactiveOutcome = await checkInByProfileId(admin, {
       actorId: servantA.userId,
+      actorRole: "SERVANT",
       profileId: memberInactive.userId,
       type: "CHURCH",
     })
@@ -610,6 +612,7 @@ test.describe("PHASE 11 — SERVANT attendance board", () => {
     // Active member recorded while SERVANT is the actor:
     const outcome = await checkInByProfileId(admin, {
       actorId: servantA.userId,
+      actorRole: "SERVANT",
       profileId: member2.userId,
       type: "SERVICE",
     })

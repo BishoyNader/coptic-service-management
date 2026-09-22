@@ -6,11 +6,11 @@ import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
-import { getServantDayData } from "@/services/servant-day-service"
-import { getScoringBoardData } from "@/services/member-scoring-service"
-import { ServantActivitiesHub, type HubServant } from "@/components/app/servant-activities-hub"
+import { listActiveClasses } from "@/services/classes-service"
+import { getClassDeskData } from "@/services/class-desk-service"
+import { SuperAdminClassDesk } from "@/components/app/super-admin-class-desk"
 
-export const metadata: Metadata = { title: "نشاط الخدام" }
+export const metadata: Metadata = { title: "دكة الصف" }
 
 const SELF_HISTORY_DAYS = 14
 const MIN_DATE_DAYS = 90
@@ -28,46 +28,29 @@ export default async function SuperAdminRecordActivitiesPage() {
     new Date(todayInstant.getTime() - SELF_HISTORY_DAYS * 86_400_000)
   )
 
-  const { data: servantProfiles } = await admin
-    .from("profiles")
-    .select("id, full_name")
-    .eq("role", ROLES.SERVANT)
-    .eq("status", "ACTIVE")
-    .order("full_name", { ascending: true })
+  const classes = await listActiveClasses(admin)
+  const first = classes[0] ?? null
 
-  const servants: HubServant[] = (servantProfiles ?? []).map((s) => ({
-    id: s.id as string,
-    fullName: (s.full_name as string) ?? "خادم",
-  }))
-
-  let initialServantId: string | null = null
-  let initialServerDay: Awaited<ReturnType<typeof getServantDayData>> | null = null
-
-  if (servants.length > 0) {
-    initialServantId = servants[0].id
-    initialServerDay = await getServantDayData(admin, servants[0].id, cairoToday, historySince)
-  }
-
-  const board = await getScoringBoardData(admin, cairoToday)
+  const desk = first
+    ? await getClassDeskData(admin, first.id, cairoToday, historySince)
+    : null
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="font-heading text-xl font-extrabold">نشاط الخدام</h1>
+        <h1 className="font-heading text-xl font-extrabold">دكة الصف</h1>
         <p className="text-sm text-muted-foreground">
-          سجّل أنشطة الخدام ودرجات المخدومين من مكان واحد
+          سجّل حضور وأنشطة الخدام ودرجات المخدومين — صف واحد في الشاشة
         </p>
       </div>
 
-      <ServantActivitiesHub
+      <SuperAdminClassDesk
+        classes={classes.map((c) => ({ id: c.id, name: c.name }))}
+        initialClassId={first ? first.id : null}
+        initialDesk={desk}
         currentUserId={profile.id}
-        isSuperAdmin={true}
-        cairoToday={cairoToday}
+        today={cairoToday}
         minDate={minDate}
-        servants={servants}
-        initialServantId={initialServantId}
-        initialDay={initialServerDay}
-        initialBoard={board}
       />
     </div>
   )

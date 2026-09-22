@@ -1,16 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { CalendarDays, Check, Church, Clock, Loader2, Users } from "lucide-react"
+import { CalendarDays, Check, Church, Clock, Lock, Users } from "lucide-react"
 import { cn } from "cn"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { formatArabicDate } from "@/lib/dates"
 import { formatCairoTime } from "@/lib/cairo"
 import { ATTENDANCE_TYPE_LABELS } from "@/lib/constants"
-import { markServantAttendanceAction } from "@/app/actions/attendance"
 import { ServantActivityPanel } from "@/components/app/servant-activity-panel"
 import type { AttendanceType } from "@/lib/types"
 
@@ -23,10 +18,12 @@ export type MyDayAttendance = {
 }
 
 /**
- * Servant's own day: today's attendance (record your presence in one tap)
- * plus a recent two-week attendance summary above the standard activity
- * panel. Attendance writes go through the server-side markServantAttendanceAction,
- * which simply records presence without time-band scoring.
+ * A servant's own day: today's attendance status (read-only — a servant no
+ * longer marks their own presence; the super admin records it from the class
+ * desk) plus a recent two-week attendance summary above the reused activity
+ * panel. Activity records are likewise super-admin only, so a servant sees
+ * their records in read-only mode while a super admin (on-behalf) can still
+ * toggle them through `servantId`.
  */
 export function ServantMyDay({
   cairoToday,
@@ -37,6 +34,7 @@ export function ServantMyDay({
   history,
   embedded = false,
   showAttendance = true,
+  readOnly = false,
   servantId,
   onChanged,
 }: {
@@ -51,33 +49,15 @@ export function ServantMyDay({
   embedded?: boolean
   /** Show attendance section — false when rendered from activities hub. */
   showAttendance?: boolean
+  /** Read-only view (servant self): records are made by the super admin only. */
+  readOnly?: boolean
   /** Subject servant when recording on behalf of another servant (super admin). */
   servantId?: string
   /** Called after any successful write so the parent can refresh its data. */
   onChanged?: () => void
 }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
-
   const todayPresent = todayAttendance.length > 0
   const latestRecord = todayAttendance[0] ?? null
-
-  const handleRecord = async () => {
-    setBusy(true)
-    const res = await markServantAttendanceAction()
-    setBusy(false)
-    if (res.status === "success") {
-      toast.success("تم تسجيل الحضور")
-      if (!embedded) router.refresh()
-      onChanged?.()
-    } else if (res.status === "duplicate") {
-      toast.info("تم تسجيل حضورك بالفعل")
-      if (!embedded) router.refresh()
-      onChanged?.()
-    } else {
-      toast.error(res.message)
-    }
-  }
 
   const showHeading = !embedded
 
@@ -87,7 +67,7 @@ export function ServantMyDay({
         <div className="space-y-1">
           <h1 className="font-heading text-xl font-extrabold">حضوري وأنشطتي</h1>
           <p className="text-sm text-muted-foreground">
-            سجّل حضورك اليوم وتابع مشاركاتك في أنشطة الخدمة — كل حاجة في مكان واحد
+            تابع حضورك ومشاركاتك في أنشطة الخدمة — كل حاجة في مكان واحد
           </p>
         </div>
       )}
@@ -129,28 +109,17 @@ export function ServantMyDay({
                   )}
                 </div>
               </div>
-              {!todayPresent && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void handleRecord()}
-                  disabled={busy}
-                  className="h-9 gap-1"
-                >
-                  {busy ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Check className="size-3.5" />
-                  )}
-                  سجّل حضوري
-                </Button>
-              )}
-              {todayPresent && (
-                <span className="flex items-center gap-1.5 rounded-full bg-coptic-teal/10 px-3 py-1.5 text-xs font-bold text-coptic-teal">
+              {todayPresent ? (
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-coptic-teal/10 px-3 py-1.5 text-xs font-bold text-coptic-teal">
                   <Check className="size-3.5" />
                   حاضر
                 </span>
-              )}
+              ) : readOnly ? (
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                  <Lock className="size-3.5" />
+                  يُسجَّل من مسؤول الخدمة
+                </span>
+              ) : null}
             </div>
           </section>
 
@@ -206,6 +175,7 @@ export function ServantMyDay({
             cairoToday={cairoToday}
             minDate={minDate}
             servantId={servantId}
+            readOnly={readOnly}
             onChanged={onChanged}
           />
         )}

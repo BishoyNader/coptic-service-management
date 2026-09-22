@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { QrCode, History, Bell, ClipboardList, CalendarCheck, Users, HandHelping } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { getServerNow } from "@/services/attendance-service"
@@ -9,6 +10,8 @@ import { cairoDateString } from "@/lib/cairo"
 import { formatArabicDate, toDateString, startOfMonth } from "@/lib/dates"
 import { NileDivider } from "@/components/coptic/brand"
 import { QrCodeCard } from "@/components/app/qr-code-card"
+import { ServantScoringBoard } from "@/components/app/servant-scoring-board"
+import { getServantClassId, getScoringBoardData } from "@/services/member-scoring-service"
 
 export default async function ServantHomePage({
   searchParams,
@@ -66,6 +69,14 @@ export default async function ServantHomePage({
     activity: { name: string; icon: string | null } | null
   }[]
   const unread = notifResult.count ?? 0
+
+  // Class-scoped served members board (admin client so a servant never reads
+  // other classes' data through RLS).
+  const admin = createAdminClient()
+  const myClassId = await getServantClassId(admin, profile.id)
+  const classBoard = myClassId
+    ? await getScoringBoardData(admin, today, myClassId)
+    : null
 
   const todayRows = (todayResult.data ?? []) as unknown as {
     profile_id: string
@@ -186,6 +197,36 @@ export default async function ServantHomePage({
           </p>
         </Link>
       </div>
+
+      {/* My class served members */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="font-heading font-bold">مخدومين صفّك</h2>
+          {classBoard && (
+            <Link href="/app/servant/activities" className="text-xs text-muted-foreground hover:text-foreground">
+              افتح لوحة التقييم
+            </Link>
+          )}
+        </div>
+        {classBoard ? (
+          <ServantScoringBoard
+            currentUserId={profile.id}
+            cairoToday={today}
+            initialBoard={classBoard}
+            embedded
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/60 px-6 py-8 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-coptic-gold-soft text-coptic-gold">
+              <Users className="size-6" />
+            </div>
+            <p className="font-heading font-semibold">لسه مفيش صف متحدد ليك</p>
+            <p className="text-sm text-muted-foreground">
+              اطلب من مسؤول الخدمة إنه يحدد صفّك — وهنا هتظهر مخدومين الصف للتقييم
+            </p>
+          </div>
+        )}
+      </section>
 
       {/* Activities */}
       <section className="space-y-2">

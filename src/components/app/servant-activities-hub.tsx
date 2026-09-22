@@ -121,7 +121,8 @@ export function ServantActivitiesHub({
             activities={day.activities}
             history={day.history}
             embedded
-            showAttendance={false}
+            showAttendance={!isSuperAdmin}
+            readOnly={!isSuperAdmin}
             onChanged={handleChanged}
           />
         ) : (

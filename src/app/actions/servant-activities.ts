@@ -85,6 +85,9 @@ export async function recordServantActivityAction(
 ): Promise<ServantActivityResult> {
   const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
+  if (actor.role !== ROLES.SUPER_ADMIN) {
+    return { ok: false, message: "أنشطة الخدام تُسجَّل من مسؤول الخدمة فقط" }
+  }
   if (!isUuid(activityId)) {
     return { ok: false, message: "نشاط غير صحيح" }
   }
@@ -161,6 +164,9 @@ export async function removeServantActivityAction(
 ): Promise<ServantActivityResult> {
   const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
+  if (actor.role !== ROLES.SUPER_ADMIN) {
+    return { ok: false, message: "أنشطة الخدام تُسجَّل من مسؤول الخدمة فقط" }
+  }
   if (!isUuid(activityId)) {
     return { ok: false, message: "نشاط غير صحيح" }
   }

@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react"
 import {
   BookOpen,
-  Check,
   Church,
   ClipboardList,
   Gem,
@@ -33,6 +32,8 @@ type ServantActivityPanelProps = {
   minDate: string
   /** Subject servant id when recording on behalf of another servant (super admin). */
   servantId?: string
+  /** Read-only view (servant self): records are made by the super admin only. */
+  readOnly?: boolean
   /** Called after a successful record/undo so the parent can refresh the history. */
   onChanged?: () => void
 }
@@ -62,6 +63,7 @@ export function ServantActivityPanel({
   cairoToday,
   minDate,
   servantId,
+  readOnly = false,
   onChanged,
 }: ServantActivityPanelProps) {
   const [date, setDate] = useState(cairoToday)
@@ -77,6 +79,7 @@ export function ServantActivityPanel({
   const isToday = date === cairoToday
 
   function toggle(activityId: string, recorded: boolean) {
+    if (readOnly) return
     if (!recorded && date > cairoToday) return
     setBusyId(activityId)
     startTransition(async () => {
@@ -118,7 +121,7 @@ export function ServantActivityPanel({
       <div className="grid grid-cols-1 gap-2">
         {activities.map((activity) => {
           const recorded = recordedIds.has(activity.id)
-          const disabled = recorded && !isToday
+          const disabled = (recorded && !isToday) || readOnly
           const Icon = activity.icon ? ICONS[activity.icon] : ClipboardList
 
           return (
@@ -156,11 +159,9 @@ export function ServantActivityPanel({
               {busyId === activity.id && isPending ? (
                 <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
               ) : recorded ? (
-                disabled ? (
-                  <Lock className="size-5 text-muted-foreground" aria-hidden="true" />
-                ) : (
-                  <Check className="size-5 text-coptic-teal" aria-hidden="true" />
-                )
+                <Lock className="size-5 text-coptic-teal" aria-hidden="true" />
+              ) : readOnly ? (
+                <span className="text-xs font-medium text-muted-foreground">—</span>
               ) : (
                 <span className="text-sm font-semibold text-coptic-teal">سجّل</span>
               )}
@@ -169,9 +170,15 @@ export function ServantActivityPanel({
         })}
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
-        المشاركات المسجلة في تاريخ سابق لا يمكن تعديلها — يمكن إلغاء تسجيل اليوم فقط.
-      </p>
+      {readOnly ? (
+        <p className="text-[11px] text-muted-foreground">
+          أنشطة الخدام تُسجَّل من مسؤول الخدمة فقط — يمكنك متابعة مشاركاتك من هنا
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          المشاركات المسجلة في تاريخ سابق لا يمكن تعديلها — يمكن إلغاء تسجيل اليوم فقط.
+        </p>
+      )}
     </div>
   )
 }

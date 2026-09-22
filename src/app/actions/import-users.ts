@@ -98,6 +98,9 @@ function validateRow(
     dateOfBirth,
   }
 
+  const memberClass = pick(row, "الصف", "class")
+  if (memberClass) input.class = memberClass
+
   if (role === ROLES.SERVED_MEMBER) {
     const fatherPhone = pick(row, "هاتف الأب", "father_phone")
     if (fatherPhone) {
@@ -119,9 +122,6 @@ function validateRow(
 
     const address = pick(row, "العنوان", "address")
     if (address) input.address = address
-
-    const memberClass = pick(row, "الصف", "class")
-    if (memberClass) input.class = memberClass
   }
 
   return { ok: true, input }
@@ -159,6 +159,23 @@ export async function importUsersAction(
   if (!actor) return { ok: false, message: "غير مصرح" }
 
   const admin = createAdminClient()
+
+  // Best-effort class resolution for free-text class names in the sheet:
+  // exact match against the active classes table yields the FK; otherwise the
+  // legacy free-text name is kept as-is on served members.
+  const activeClasses = await admin
+    .from("classes")
+    .select("id, name")
+    .eq("is_active", true)
+  const classByName = new Map<string, string>()
+  for (const c of (activeClasses.data ?? [])) {
+    classByName.set(String(c.name ?? ""), String(c.id))
+  }
+  const resolveClassId = (name: string | undefined): string | undefined => {
+    if (!name) return undefined
+    return classByName.get(name.trim())
+  }
+
   const results: ImportResult[] = []
   let created = 0
   let failed = 0
@@ -172,6 +189,8 @@ export async function importUsersAction(
       failed++
       continue
     }
+
+    validation.input.classId = resolveClassId(validation.input.class)
 
     const result = await createAdminUser(admin, actor.actorId, validation.input)
 

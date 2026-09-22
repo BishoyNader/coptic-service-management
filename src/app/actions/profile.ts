@@ -167,7 +167,10 @@ type AdminCreateUserActionPayload = {
   address?: string
   fatherPhone?: string
   motherPhone?: string
+  /** Free-text class name (legacy) — kept for import flows. */
   memberClass?: string
+  /** Classes FK for both roles. */
+  memberClassId?: string
 }
 
 export type AdminCreateUserActionResult =
@@ -230,6 +233,7 @@ export async function adminCreateUserAction(
     fatherPhone: payload.fatherPhone,
     motherPhone: payload.motherPhone,
     class: payload.memberClass,
+    classId: payload.memberClassId,
   }
 
   return createAdminUser(adminClient, user.id, input)

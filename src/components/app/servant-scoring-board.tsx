@@ -84,6 +84,7 @@ export function ServantScoringBoard({
   initialBoard,
   embedded = false,
   allowRemoveAny = false,
+  classId,
 }: {
   currentUserId: string
   cairoToday: string
@@ -92,6 +93,8 @@ export function ServantScoringBoard({
   embedded?: boolean
   /** Allow tapping an attendance chip to remove it even when someone else recorded it. */
   allowRemoveAny?: boolean
+  /** Optional class scope to pass through to the board action (super admin desks). */
+  classId?: string
 }) {
   const [tab, setTab] = useState<"today" | "history">("today")
 
@@ -110,14 +113,14 @@ export function ServantScoringBoard({
 
   const reloadToday = useCallback(async () => {
     setReloading(true)
-    const res = await getScoringBoardAction(cairoToday)
+    const res = await getScoringBoardAction(cairoToday, classId)
     setReloading(false)
     if (res.ok) setTodayBoard(res.board)
-  }, [cairoToday])
+  }, [cairoToday, classId])
 
   const loadHistory = useCallback(async (when: string) => {
     setHistoryLoading(true)
-    const res = await getScoringBoardAction(when)
+    const res = await getScoringBoardAction(when, classId)
     setHistoryLoading(false)
     if (res.ok) {
       setHistoryBoard(res.board)
@@ -125,7 +128,7 @@ export function ServantScoringBoard({
       setHistoryBoard(null)
       toast.error(res.message)
     }
-  }, [])
+  }, [classId])
 
   const handleTabChange = (v: string) => {
     setTab(v as "today" | "history")
