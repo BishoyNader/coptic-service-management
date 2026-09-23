@@ -13,13 +13,7 @@ import { ROLES } from "../lib/roles"
 import { cairoDateString } from "../lib/cairo"
 import { getServantDayData, type ServantDayData } from "./servant-day-service"
 import {
-  getScoringBoardData,
-  upsertMemberActivityScore,
-  type ScoringBoardData,
-} from "./member-scoring-service"
-import {
   getServerNow,
-  recordChildAttendance,
   recordServantAttendance,
   removeDeskAttendanceRecord,
 } from "./attendance-service"
@@ -35,7 +29,6 @@ export type ClassDeskData = {
   classId: string
   className: string
   servants: DeskServant[]
-  board: ScoringBoardData
 }
 
 /** Active servants of a class, ordered by name. */
@@ -117,10 +110,7 @@ export async function getClassDeskData(
     .eq("id", classId)
     .maybeSingle()
 
-  const [servantProfiles, board] = await Promise.all([
-    listClassServants(admin, classId),
-    getScoringBoardData(admin, date, classId),
-  ])
+  const servantProfiles = await listClassServants(admin, classId)
 
   const servants: DeskServant[] = await Promise.all(
     servantProfiles.map(async (p) => ({
@@ -134,33 +124,24 @@ export async function getClassDeskData(
     classId,
     className: (cls?.name as string | undefined) ?? "صف",
     servants,
-    board,
   }
 }
 
 // --- Batch save -------------------------------------------------------------
 
 export type DeskSaveServantAttendance = { profileId: string; present: boolean }
-export type DeskSaveMemberAttendance = {
-  memberId: string
-  type: "CHURCH" | "SERVICE"
-  present: boolean
-}
 export type DeskSaveServantActivity = {
   servantId: string
   date: string
   activityId: string
   recorded: boolean
 }
-export type DeskSaveMemberScore = { memberId: string; activityId: string; points: number }
 
 export type DeskSaveInput = {
   classId: string
   date: string
   servantAttendance: DeskSaveServantAttendance[]
   servantActivities: DeskSaveServantActivity[]
-  memberAttendance: DeskSaveMemberAttendance[]
-  memberScores: DeskSaveMemberScore[]
 }
 
 export type DeskSaveSummary = {
@@ -169,8 +150,6 @@ export type DeskSaveSummary = {
   /** How many per group were applied successfully. */
   servantAttendance: number
   servantActivities: number
-  memberAttendance: number
-  memberScores: number
   /** How many individual writes were rejected/errored. */
   failed: number
 }
@@ -299,8 +278,6 @@ export async function applyDeskSave(
   let failed = 0
   let servantAttendance = 0
   let servantActivities = 0
-  let memberAttendance = 0
-  let memberScores = 0
 
   for (const it of input.servantAttendance) {
     if (it.present) {
@@ -320,30 +297,6 @@ export async function applyDeskSave(
     }
   }
 
-  for (const it of input.memberAttendance) {
-    if (it.present) {
-      const outcome = await recordChildAttendance(admin, {
-        actorId,
-        actorRole: ROLES.SUPER_ADMIN,
-        memberId: it.memberId,
-        type: it.type,
-        date: input.date,
-      })
-      if (outcome.status === "error") failed += 1
-      else memberAttendance += 1
-    } else {
-      const id = await findDeskAttendanceId(admin, it.memberId, input.date, it.type)
-      if (!id) continue
-      const res = await removeDeskAttendanceRecord(admin, {
-        actorId,
-        actorRole: ROLES.SUPER_ADMIN,
-        recordId: id,
-      })
-      if (res.ok) memberAttendance += 1
-      else failed += 1
-    }
-  }
-
   for (const it of input.servantActivities) {
     const res = it.recorded
       ? await recordDeskServantActivity(admin, actorId, it)
@@ -352,19 +305,7 @@ export async function applyDeskSave(
     else failed += 1
   }
 
-  for (const it of input.memberScores) {
-    const res = await upsertMemberActivityScore(admin, {
-      actorId,
-      memberId: it.memberId,
-      activityId: it.activityId,
-      date: input.date,
-      points: it.points,
-    })
-    if (res.ok) memberScores += 1
-    else failed += 1
-  }
-
-  const total = servantAttendance + servantActivities + memberAttendance + memberScores
+  const total = servantAttendance + servantActivities
   const message =
     failed === 0
       ? `تم حفظ التعديلات ✓ (${total})`
@@ -377,8 +318,6 @@ export async function applyDeskSave(
     message,
     servantAttendance,
     servantActivities,
-    memberAttendance,
-    memberScores,
     failed,
   }
 }

@@ -37,7 +37,6 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin/classes", label: "الأصناف", icon: "book-open" },
   { href: "/app/super-admin/servants", label: "الخدام", icon: "hand-helping" },
   { href: "/app/super-admin/attendance", label: "الحضور", icon: "scan" },
-  { href: "/app/super-admin/scores", label: "الدرجات", icon: "star" },
   { href: "/app/super-admin/notifications", label: "الإشعارات", icon: "bell" },
   { href: "/app/super-admin/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/super-admin/activities", label: "الأنشطة", icon: "clipboard" },

@@ -720,7 +720,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
   // 62. Super Admin can correct scores on the super-admin page too.
   test("62. Super Admin corrects a score to 9", async ({ page }) => {
     await login(page, superSeed.phone, superSeed.password)
-    await openScoring(page, "/app/super-admin/scores", member.displayName)
+    await openScoring(page, "/app/super-admin/record-activities", member.displayName)
     await page.getByRole("radio", { name: "الالتزام 9", exact: true }).click()
     await saveScoring(page)
 
@@ -762,7 +762,7 @@ test.describe("PHASE 4 — Centralized scoring engine", () => {
 
     // Un-checking a checkbox voids the record (SCORE_CORRECTED, is_voided).
     await login(page, superSeed.phone, superSeed.password)
-    await openScoring(page, "/app/super-admin/scores", member.displayName)
+    await openScoring(page, "/app/super-admin/record-activities", member.displayName)
     await page.getByRole("checkbox", { name: "لبس التونية" }).uncheck()
     await saveScoring(page)
     await expect

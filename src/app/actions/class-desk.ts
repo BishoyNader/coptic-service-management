@@ -217,17 +217,14 @@ function isRealDateString(value: string): boolean {
 
 const MAX_SERVANT_ROWS = 400
 const MAX_ACTIVITY_ROWS = 2000
-const MAX_MEMBER_ROWS = 400
-const MAX_SCORE_ROWS = 4000
 
 export type SaveClassDeskResult = { ok: boolean; message: string; summary?: DeskSaveSummary }
 
 /**
  * Super Admin only: persists a whole class-desk draft in one call — servant
- * attendance, servant activities, served-member attendance and served-member
- * scores. Every write is validated + audited, individual failures are counted,
- * and the caller re-fetches the desk afterwards so the page reflects the save
- * automatically.
+ * attendance and servant activities. Every write is validated + audited,
+ * individual failures are counted, and the caller re-fetches the desk
+ * afterwards so the page reflects the save automatically.
  */
 export async function saveClassDeskAction(input: DeskSaveInput): Promise<SaveClassDeskResult> {
   const actorId = await requireSuperAdmin()
@@ -262,29 +259,11 @@ export async function saveClassDeskAction(input: DeskSaveInput): Promise<SaveCla
     return { ok: false, message: "أنشطة الخدام تُسجَّل في أيام الجمعة (السابقة) فقط" }
   }
 
-  const memberAttendance = (Array.isArray(input.memberAttendance) ? input.memberAttendance : [])
-    .filter(
-      (r) =>
-        r &&
-        isUuid(r.memberId) &&
-        (r.type === "CHURCH" || r.type === "SERVICE") &&
-        typeof r.present === "boolean"
-    )
-    .slice(0, MAX_MEMBER_ROWS)
-
-  const memberScores = (Array.isArray(input.memberScores) ? input.memberScores : [])
-    .filter(
-      (r) => r && isUuid(r.memberId) && isUuid(r.activityId) && Number.isFinite(r.points)
-    )
-    .slice(0, MAX_SCORE_ROWS)
-
   const summary = await applyDeskSave(admin, actorId, {
     classId: input.classId,
     date: input.date,
     servantAttendance,
     servantActivities,
-    memberAttendance,
-    memberScores,
   })
 
   return { ok: summary.ok, message: summary.message, summary }

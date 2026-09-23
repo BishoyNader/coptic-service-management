@@ -21,10 +21,6 @@ import {
   saveClassDeskAction,
 } from "@/app/actions/class-desk"
 import { ServantActivityPanel } from "@/components/app/servant-activity-panel"
-import {
-  ServantScoringBoard,
-  type BoardDraftState,
-} from "@/components/app/servant-scoring-board"
 import type {
   ClassDeskData,
   ConnectableServant,
@@ -43,10 +39,9 @@ type ActivityDraftMap = Record<string, Record<string, Record<string, boolean>>>
  *  - "خدام الصف": every active servant of the class with their today's
  *    attendance toggle and an expandable activities panel. Everything is a
  *    local draft — nothing is written on tap.
- *  - "مخدومين الصف": the shared class-scoped scoring board in draft mode
- *    (attendance + scores are collected locally too).
  *  - A single "حفظ" button persists all draft changes in one batch and
- *    re-fetches the desk, so the page updates automatically.
+ *    re-fetches the desk, so the page updates automatically. (Served-member
+ *    weekly scores are managed by the درجات section on the same page.)
  *
  * All writes go through the super-admin-gated `saveClassDeskAction`.
  */
@@ -54,14 +49,12 @@ export function SuperAdminClassDesk({
   classes,
   initialClassId,
   initialDesk,
-  currentUserId,
   today,
   fridays,
 }: {
   classes: ClassOption[]
   initialClassId: string | null
   initialDesk: ClassDeskData | null
-  currentUserId: string
   today: string
   /** Selectable past ministry Fridays (newest-first) for servant activities. */
   fridays: string[]
@@ -72,9 +65,7 @@ export function SuperAdminClassDesk({
 
   const [servantAttendance, setServantAttendance] = useState<Record<string, boolean>>({})
   const [activityDrafts, setActivityDrafts] = useState<ActivityDraftMap>({})
-  const [boardDrafts, setBoardDrafts] = useState<BoardDraftState | null>(null)
   const [saving, setSaving] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   // "ربط خدام" panel — connect unassigned servants to the selected class.
   const [connectList, setConnectList] = useState<ConnectableServant[] | null>(null)
@@ -85,7 +76,6 @@ export function SuperAdminClassDesk({
   const resetDrafts = useCallback(() => {
     setServantAttendance({})
     setActivityDrafts({})
-    setBoardDrafts(null)
   }, [])
 
   const resetConnectPanel = useCallback(() => {
@@ -122,7 +112,6 @@ export function SuperAdminClassDesk({
     if (res.ok) {
       toast.success(res.message)
       resetConnectPanel()
-      setRefreshKey((k) => k + 1)
       void reload(classId)
     } else {
       toast.error(res.message)
@@ -148,7 +137,6 @@ export function SuperAdminClassDesk({
     if (!value || value === classId) return
     resetDrafts()
     resetConnectPanel()
-    setRefreshKey((k) => k + 1)
     void reload(value)
   }
 
@@ -244,11 +232,9 @@ export function SuperAdminClassDesk({
     }))
   }
 
-  const boardDirty =
-    (boardDrafts?.attendance.length ?? 0) > 0 || (boardDrafts?.scores.length ?? 0) > 0
   const attendanceDirty = Object.keys(servantAttendance).length > 0
   const activityDirty = Object.keys(activityDrafts).length > 0
-  const hasChanges = attendanceDirty || activityDirty || boardDirty
+  const hasChanges = attendanceDirty || activityDirty
 
   const handleSave = async () => {
     if (!classId || saving) return
@@ -272,8 +258,6 @@ export function SuperAdminClassDesk({
         present,
       })),
       servantActivities,
-      memberAttendance: boardDrafts?.attendance ?? [],
-      memberScores: boardDrafts?.scores ?? [],
     }
 
     setSaving(true)
@@ -283,7 +267,6 @@ export function SuperAdminClassDesk({
     if (res.ok) {
       toast.success(res.message)
       resetDrafts()
-      setRefreshKey((k) => k + 1)
       void reload(classId)
     } else {
       toast.error(res.message)
@@ -301,10 +284,8 @@ export function SuperAdminClassDesk({
             0
           ),
         0
-      ) +
-      (boardDrafts?.attendance.length ?? 0) +
-      (boardDrafts?.scores.length ?? 0),
-    [servantAttendance, activityDrafts, boardDrafts]
+      ),
+    [servantAttendance, activityDrafts]
   )
 
   if (classes.length === 0) {
@@ -409,28 +390,6 @@ export function SuperAdminClassDesk({
                 ))}
               </div>
             )}
-          </section>
-
-          {/* Served members of the class — shared class-scoped board (draft mode) */}
-          <section aria-label="مخدومين الصف" className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading font-bold">مخدومين الصف</h2>
-              <span className="rounded-full bg-coptic-gold-soft px-3 py-1 text-xs font-bold text-coptic-gold">
-                {desk.board.members.length} مخدوم
-              </span>
-            </div>
-
-            <ServantScoringBoard
-              key={`${desk.classId}-${refreshKey}`}
-              currentUserId={currentUserId}
-              cairoToday={today}
-              initialBoard={desk.board}
-              classId={desk.classId}
-              embedded
-              allowRemoveAny
-              draftMode
-              onDraftsChange={setBoardDrafts}
-            />
           </section>
 
           {/* Sticky save bar */}
