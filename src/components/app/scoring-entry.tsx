@@ -2,16 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CalendarPlus, Save, Star, Loader2 } from "lucide-react"
+import { CalendarPlus, Save, Star, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { lastFridayOnOrBefore } from "@/lib/friday"
+import { fridayArabicLabel, lastFridayOnOrBefore } from "@/lib/friday"
 import {
   getScoreEntryViewAction,
   grantMonthlyActivityAction,
   saveWeeklyScoresAction,
 } from "@/app/actions/scoring"
+import { recordChildAttendanceAction } from "@/app/actions/children"
 import type { ScorableMember, WeeklyEntryState } from "@/services/scoring-service"
 import type { ScoringCategory } from "@/lib/constants"
 
@@ -28,15 +29,21 @@ const COMMITMENT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 export function ScoringEntry({
   members,
+  fridays,
 }: {
   members: ScorableMember[]
+  /** When provided, the week picker is restricted to these ministry Fridays only. */
+  fridays?: string[]
 }) {
   const router = useRouter()
   const [memberId, setMemberId] = useState("")
-  const [weekDate, setWeekDate] = useState(() => lastFridayOnOrBefore(cairoToday()))
+  const [weekDate, setWeekDate] = useState(() =>
+    fridays && fridays.length > 0 ? fridays[0] : lastFridayOnOrBefore(cairoToday())
+  )
   const [state, setState] = useState<WeeklyEntryState | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [addingType, setAddingType] = useState<"CHURCH" | "SERVICE" | null>(null)
 
   const [commitment, setCommitment] = useState(0)
   const [serviceCommitment, setServiceCommitment] = useState(0)
@@ -129,6 +136,20 @@ export function ScoringEntry({
     }
   }
 
+  const handleAddAttendance = async (type: "CHURCH" | "SERVICE") => {
+    if (!memberId || !weekDate) return
+    setAddingType(type)
+    const res = await recordChildAttendanceAction(memberId, type, weekDate)
+    setAddingType(null)
+    await load(memberId, weekDate)
+    if (res.ok || res.duplicate) {
+      toast[res.ok ? "success" : "info"](res.message)
+      router.refresh()
+    } else {
+      toast.error(res.message)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Selectors */}
@@ -156,16 +177,40 @@ export function ScoringEntry({
           <label htmlFor="scoring-week" className="text-sm font-medium">
             أسبوع&nbsp;/&nbsp;تاريخ
           </label>
-          <input
-            id="scoring-week"
-            aria-label="أسبوع"
-            type="date"
-            value={weekDate}
-            onChange={(e) => setWeekDate(lastFridayOnOrBefore(e.target.value || cairoToday()))}
-            className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-          />
+          {fridays ? (
+            fridays.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                لا توجد أيام جمعة سابقة متاحة للتسجيل
+              </p>
+            ) : (
+              <select
+                id="scoring-week"
+                aria-label="أسبوع"
+                value={weekDate}
+                onChange={(e) => setWeekDate(e.target.value || cairoToday())}
+                className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+              >
+                {fridays.map((f) => (
+                  <option key={f} value={f}>
+                    {fridayArabicLabel(f)}
+                  </option>
+                ))}
+              </select>
+            )
+          ) : (
+            <input
+              id="scoring-week"
+              aria-label="أسبوع"
+              type="date"
+              value={weekDate}
+              onChange={(e) => setWeekDate(lastFridayOnOrBefore(e.target.value || cairoToday()))}
+              className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            />
+          )}
           <p className="text-[11px] text-muted-foreground">
-            يُسجَّل يوم الجمعة فقط — أي تاريخ يُحوَّل إلى أقرب جمعة
+            {fridays
+              ? "يُسجَّل يوم الجمعة فقط — من أيام الجمعة المحدّدة"
+              : "يُسجَّل يوم الجمعة فقط — أي تاريخ يُحوَّل إلى أقرب جمعة"}
           </p>
         </div>
       </div>
@@ -174,19 +219,61 @@ export function ScoringEntry({
         <div className="space-y-4">
           <p className="text-center text-xs text-muted-foreground">{state.period.label}</p>
 
-          {/* Attendance — read-only, always from the attendance engine */}
+          {/* Attendance — entered automatically on check-in; add manually when missing */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-foreground/5">
               <p className="text-[11px] text-muted-foreground">حضور القداس (تلقائي)</p>
-              <p className="mt-1 font-heading text-lg font-extrabold text-coptic-gold">
-                {state.attendance.church.count > 0 ? `+${state.attendance.church.points}` : "—"}
-              </p>
+              {state.dayAttendance.church.present ? (
+                <p className="mt-1 font-heading text-lg font-extrabold text-coptic-gold">
+                  +{state.dayAttendance.church.points}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <p className="font-heading text-lg font-extrabold text-muted-foreground">—</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 text-xs"
+                    aria-label="تسجيل حضور القداس يدوياً"
+                    onClick={() => handleAddAttendance("CHURCH")}
+                    disabled={addingType !== null}
+                  >
+                    {addingType === "CHURCH" ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Plus className="size-3" />
+                    )}
+                    إدخال الحضور
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-foreground/5">
               <p className="text-[11px] text-muted-foreground">حضور الخدمة (تلقائي)</p>
-              <p className="mt-1 font-heading text-lg font-extrabold text-coptic-gold">
-                {state.attendance.service.count > 0 ? `+${state.attendance.service.points}` : "—"}
-              </p>
+              {state.dayAttendance.service.present ? (
+                <p className="mt-1 font-heading text-lg font-extrabold text-coptic-gold">
+                  +{state.dayAttendance.service.points}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <p className="font-heading text-lg font-extrabold text-muted-foreground">—</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 text-xs"
+                    aria-label="تسجيل حضور الخدمة يدوياً"
+                    onClick={() => handleAddAttendance("SERVICE")}
+                    disabled={addingType !== null}
+                  >
+                    {addingType === "SERVICE" ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Plus className="size-3" />
+                    )}
+                    إدخال الحضور
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 

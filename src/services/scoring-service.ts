@@ -109,6 +109,11 @@ export async function getMemberScoreView(
 export type WeeklyEntryState = {
   period: ScorePeriod
   attendance: AttendanceSlice
+  /** Exact-day (the selected Friday) attendance presence + points per type. */
+  dayAttendance: {
+    church: { present: boolean; points: number }
+    service: { present: boolean; points: number }
+  }
   /** Current persisted manual points per category (0 = nothing recorded). */
   existing: Partial<Record<ScoringCategory, number>>
   /** The exact configured point values for checkbox categories. */
@@ -128,27 +133,36 @@ export async function getWeeklyEntryState(
 ): Promise<WeeklyEntryState> {
   const period = periodForDate(WEEKLY, weekRef)
   const rules = rulesByCategory(await getActiveScoringRules(admin, MANUAL_SCORE_CATEGORIES))
+  const refDate = toDateString(weekRef)
 
-  const [rowsResult, latestResult, breakdown, monthlyBreakdown] = await Promise.all([
-    admin
-      .from("score_records")
-      .select("category, points")
-      .eq("profile_id", profileId)
-      .eq("is_voided", false)
-      .gte("session_date", period.startDate)
-      .lte("session_date", period.endDate),
-    admin
-      .from("score_records")
-      .select("session_date")
-      .eq("profile_id", profileId)
-      .eq("category", "MONTHLY_ACTIVITY")
-      .eq("is_voided", false)
-      .order("session_date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    calculateScoreBreakdown(admin, profileId, WEEKLY, weekRef),
-    calculateScoreBreakdown(admin, profileId, MONTHLY, weekRef),
-  ])
+  const [rowsResult, latestResult, breakdown, monthlyBreakdown, dayRowsResult] =
+    await Promise.all([
+      admin
+        .from("score_records")
+        .select("category, points")
+        .eq("profile_id", profileId)
+        .eq("is_voided", false)
+        .gte("session_date", period.startDate)
+        .lte("session_date", period.endDate),
+      admin
+        .from("score_records")
+        .select("session_date")
+        .eq("profile_id", profileId)
+        .eq("category", "MONTHLY_ACTIVITY")
+        .eq("is_voided", false)
+        .order("session_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      calculateScoreBreakdown(admin, profileId, WEEKLY, weekRef),
+      calculateScoreBreakdown(admin, profileId, MONTHLY, weekRef),
+      admin
+        .from("score_records")
+        .select("category, points")
+        .eq("profile_id", profileId)
+        .eq("is_voided", false)
+        .eq("session_date", refDate)
+        .in("category", ["CHURCH_ATTENDANCE", "SERVICE_ATTENDANCE"]),
+    ])
 
   const existing: Partial<Record<ScoringCategory, number>> = {}
   for (const r of rowsResult.data ?? []) {
@@ -163,9 +177,24 @@ export async function getWeeklyEntryState(
     if (r) configured[r.category as ScoringCategory] = Number(r.point_value)
   }
 
+  const dayByCategory: Partial<Record<ScoringCategory, { count: number; points: number }>> = {}
+  for (const r of dayRowsResult.data ?? []) {
+    const category = r.category as ScoringCategory
+    const cur = dayByCategory[category] ?? { count: 0, points: 0 }
+    cur.count += 1
+    cur.points += Number(r.points)
+    dayByCategory[category] = cur
+  }
+  const church = dayByCategory.CHURCH_ATTENDANCE ?? { count: 0, points: 0 }
+  const service = dayByCategory.SERVICE_ATTENDANCE ?? { count: 0, points: 0 }
+
   return {
     period,
     attendance: breakdown.attendance,
+    dayAttendance: {
+      church: { present: church.count > 0, points: church.points },
+      service: { present: service.count > 0, points: service.points },
+    },
     existing,
     configured,
     latestMonthlyActivity: latestResult.data?.session_date ?? null,

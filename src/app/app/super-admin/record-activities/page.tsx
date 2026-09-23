@@ -76,7 +76,7 @@ export default async function SuperAdminRecordActivitiesPage() {
             description="أضف مخدوماً لبدء تسجيل الدرجات"
           />
         ) : (
-          <ScoringEntry members={members} />
+          <ScoringEntry members={members} fridays={fridays} />
         )}
 
         <details className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
