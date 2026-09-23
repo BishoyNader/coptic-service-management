@@ -6,6 +6,14 @@ import { CalendarPlus, Save, Star, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { fridayArabicLabel, lastFridayOnOrBefore } from "@/lib/friday"
 import {
   getScoreEntryViewAction,
@@ -30,10 +38,13 @@ const COMMITMENT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 export function ScoringEntry({
   members,
   fridays,
+  classId,
 }: {
   members: ScorableMember[]
   /** When provided, the week picker is restricted to these ministry Fridays only. */
   fridays?: string[]
+  /** When provided, only members assigned to this class are selectable. */
+  classId?: string | null
 }) {
   const router = useRouter()
   const [memberId, setMemberId] = useState("")
@@ -44,12 +55,17 @@ export function ScoringEntry({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [addingType, setAddingType] = useState<"CHURCH" | "SERVICE" | null>(null)
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false)
+  const [attendanceType, setAttendanceType] = useState<"CHURCH" | "SERVICE" | null>(null)
+  const [attendanceValue, setAttendanceValue] = useState(0)
 
   const [commitment, setCommitment] = useState(0)
   const [serviceCommitment, setServiceCommitment] = useState(0)
   const [tunic, setTunic] = useState(false)
   const [communion, setCommunion] = useState(false)
   const [bonus, setBonus] = useState(false)
+
+  const visibleMembers = classId ? members.filter((m) => m.class_id === classId) : members
 
   const load = useCallback(
     async (profileId: string, date: string) => {
@@ -136,10 +152,11 @@ export function ScoringEntry({
     }
   }
 
-  const handleAddAttendance = async (type: "CHURCH" | "SERVICE") => {
+  const handleAddAttendance = async (type: "CHURCH" | "SERVICE", points: number) => {
     if (!memberId || !weekDate) return
     setAddingType(type)
-    const res = await recordChildAttendanceAction(memberId, type, weekDate)
+    setAttendanceDialogOpen(false)
+    const res = await recordChildAttendanceAction(memberId, type, weekDate, points)
     setAddingType(null)
     await load(memberId, weekDate)
     if (res.ok || res.duplicate) {
@@ -149,6 +166,17 @@ export function ScoringEntry({
       toast.error(res.message)
     }
   }
+
+  const openAttendanceDialog = (type: "CHURCH" | "SERVICE") => {
+    const category: ScoringCategory =
+      type === "CHURCH" ? "CHURCH_ATTENDANCE" : "SERVICE_ATTENDANCE"
+    setAttendanceValue(Math.min(cfg(category), 10))
+    setAttendanceType(type)
+    setAttendanceDialogOpen(true)
+  }
+
+  const attendanceCategory: ScoringCategory =
+    attendanceType === "CHURCH" ? "CHURCH_ATTENDANCE" : "SERVICE_ATTENDANCE"
 
   return (
     <div className="space-y-4">
@@ -165,8 +193,10 @@ export function ScoringEntry({
             onChange={(e) => setMemberId(e.target.value)}
             className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
           >
-            <option value="">اختار المخدوم…</option>
-            {members.map((m) => (
+            <option value="">
+              {visibleMembers.length > 0 ? "اختار المخدوم…" : "لا يوجد مخدومون في هذا الصف"}
+            </option>
+            {visibleMembers.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.full_name}
               </option>
@@ -235,7 +265,7 @@ export function ScoringEntry({
                     size="sm"
                     className="gap-1 text-xs"
                     aria-label="تسجيل حضور القداس يدوياً"
-                    onClick={() => handleAddAttendance("CHURCH")}
+                    onClick={() => openAttendanceDialog("CHURCH")}
                     disabled={addingType !== null}
                   >
                     {addingType === "CHURCH" ? (
@@ -262,7 +292,7 @@ export function ScoringEntry({
                     size="sm"
                     className="gap-1 text-xs"
                     aria-label="تسجيل حضور الخدمة يدوياً"
-                    onClick={() => handleAddAttendance("SERVICE")}
+                    onClick={() => openAttendanceDialog("SERVICE")}
                     disabled={addingType !== null}
                   >
                     {addingType === "SERVICE" ? (
@@ -379,6 +409,46 @@ export function ScoringEntry({
           )}
         </div>
       )}
+
+      {/* Attendance value picker — the admin chooses how many points the entry earns. */}
+      <Dialog
+        open={attendanceDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && addingType === null) setAttendanceDialogOpen(false)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {attendanceType === "CHURCH" ? "درجة حضور القداس" : "درجة حضور الخدمة"}
+            </DialogTitle>
+            <DialogDescription>
+              اختر قيمة درجة الحضور ليوم {fridayArabicLabel(weekDate)}
+            </DialogDescription>
+          </DialogHeader>
+          <CommitmentPicker
+            label="درجة الحضور"
+            value={attendanceValue}
+            onChange={setAttendanceValue}
+          />
+          <p className="text-center text-[11px] text-muted-foreground">
+            القيمة الافتراضية من القواعد: +{cfg(attendanceCategory)} نقطة
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() =>
+                attendanceType && void handleAddAttendance(attendanceType, attendanceValue)
+              }
+              disabled={addingType !== null}
+              className="gap-2"
+            >
+              {addingType !== null ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {addingType !== null ? "جاري التسجيل…" : "تسجيل الحضور"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

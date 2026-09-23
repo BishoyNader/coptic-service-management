@@ -68,13 +68,16 @@ export type ChildAttendanceActionResult = {
 }
 
 /**
- * A servant records a child's attendance for a chosen Cairo date. Duplicate
- * same-session entries resolve to an informative "already recorded".
+ * A servant (or super admin) records a served member's attendance for a chosen
+ * Cairo date. A duplicate same-session entry resolves to an informative
+ * "already recorded". When `points` is provided the admin explicitly picks the
+ * attendance score value instead of the band resolution.
  */
 export async function recordChildAttendanceAction(
   memberId: string,
   type: string,
-  date: string
+  date: string,
+  points?: number
 ): Promise<ChildAttendanceActionResult> {
   const actor = await requireServantActor()
   if (!actor) return { ok: false, message: "غير مصرح" }
@@ -84,6 +87,9 @@ export async function recordChildAttendanceAction(
   }
   if (typeof date !== "string" || !isRealDateString(date)) {
     return { ok: false, message: "التاريخ غير صحيح" }
+  }
+  if (points !== undefined && validateCommitmentScore(points) === null) {
+    return { ok: false, message: "درجة الحضور غير صحيحة" }
   }
 
   const admin = createAdminClient()
@@ -104,6 +110,7 @@ export async function recordChildAttendanceAction(
     memberId,
     type,
     date,
+    points,
   })
 
   if (res.status === "success") {

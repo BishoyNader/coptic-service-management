@@ -207,9 +207,15 @@ async function executeCheckIn(
     now: Date
     /** Cairo wall-date (YYYY-MM-DD) of the session. Defaults to cairoDateString(now). */
     sessionDate?: string
+    /**
+     * Explicit attendance points (served members only), used for manual entry
+     * where an admin picks the value. When omitted the attendance band rules
+     * resolve the points as usual.
+     */
+    pointsOverride?: number
   }
 ): Promise<CheckInOutcome> {
-  const { actorId, actorRole, person, type, source, now } = params
+  const { actorId, actorRole, person, type, source, now, pointsOverride } = params
   const cairoDate = params.sessionDate ?? cairoDateString(now)
 
   if (person.status !== "ACTIVE") {
@@ -264,7 +270,7 @@ async function executeCheckIn(
       (rules ?? []) as Parameters<typeof resolveAttendanceBand>[2],
       person.role
     )
-    points = resolution.points
+    points = pointsOverride ?? resolution.points
   }
 
   // Compute period key for score_records so the weekly/monthly engine
@@ -632,9 +638,11 @@ export async function recordChildAttendance(
     memberId: string
     type: AttendanceType
     date: string
+    /** Explicit points override — used when an admin picks the attendance value. */
+    points?: number
   }
 ): Promise<CheckInOutcome> {
-  const { actorId, actorRole, memberId, type, date } = params
+  const { actorId, actorRole, memberId, type, date, points } = params
 
   const person = await resolvePersonByProfileId(admin, memberId)
   if (!person) return { status: "error", message: "الشخص غير موجود" }
@@ -660,6 +668,7 @@ export async function recordChildAttendance(
     source: "MANUAL",
     now: cairoLocalToInstant(date, CHILD_ATTENDANCE_DEFAULT_TIMES[type]),
     sessionDate: date,
+    pointsOverride: points,
   })
 }
 

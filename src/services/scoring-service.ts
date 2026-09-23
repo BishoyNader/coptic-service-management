@@ -132,7 +132,13 @@ export async function getWeeklyEntryState(
   weekRef: Date | string
 ): Promise<WeeklyEntryState> {
   const period = periodForDate(WEEKLY, weekRef)
-  const rules = rulesByCategory(await getActiveScoringRules(admin, MANUAL_SCORE_CATEGORIES))
+  const rules = rulesByCategory(
+    await getActiveScoringRules(admin, [
+      ...MANUAL_SCORE_CATEGORIES,
+      "CHURCH_ATTENDANCE",
+      "SERVICE_ATTENDANCE",
+    ])
+  )
   const refDate = toDateString(weekRef)
 
   const [rowsResult, latestResult, breakdown, monthlyBreakdown, dayRowsResult] =
@@ -609,16 +615,36 @@ export async function grantMonthlyActivity(
 
 // --- Admin member list ------------------------------------------------------
 
-export type ScorableMember = { id: string; full_name: string }
+export type ScorableMember = {
+  id: string
+  full_name: string
+  /** The served member's assigned class (null when unassigned). */
+  class_id?: string | null
+}
 
 export async function listScorableMembers(admin: ScoreClient): Promise<ScorableMember[]> {
   const { data } = await admin
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, served_members(class_id)")
     .eq("role", ROLES.SERVED_MEMBER)
     .eq("status", "ACTIVE")
     .order("full_name")
-  return (data ?? []) as ScorableMember[]
+  return ((data ?? []) as RawScorableMember[]).map((r) => {
+    const detail = Array.isArray(r.served_members)
+      ? r.served_members[0]
+      : r.served_members
+    return {
+      id: r.id,
+      full_name: r.full_name,
+      class_id: detail?.class_id ?? null,
+    }
+  })
+}
+
+type RawScorableMember = {
+  id: string
+  full_name: string
+  served_members?: { class_id: string | null } | Array<{ class_id: string | null }> | null
 }
 
 export type { ScoreBreakdown, ScorePeriod, ScorePeriodKind, AttendanceSlice }

@@ -51,6 +51,7 @@ export function SuperAdminClassDesk({
   initialDesk,
   today,
   fridays,
+  onClassChange,
 }: {
   classes: ClassOption[]
   initialClassId: string | null
@@ -58,6 +59,8 @@ export function SuperAdminClassDesk({
   today: string
   /** Selectable past ministry Fridays (newest-first) for servant activities. */
   fridays: string[]
+  /** Fired whenever the actively-selected class changes (list switching). */
+  onClassChange?: (classId: string | null) => void
 }) {
   const [classId, setClassId] = useState<string | null>(initialClassId)
   const [desk, setDesk] = useState<ClassDeskData | null>(initialDesk)
@@ -126,17 +129,19 @@ export function SuperAdminClassDesk({
       if (res.ok) {
         setDesk(res.data)
         setClassId(res.data.classId)
+        onClassChange?.(res.data.classId)
       } else {
         toast.error(res.message)
       }
     },
-    []
+    [onClassChange]
   )
 
   const handleClassChange = (value: string) => {
     if (!value || value === classId) return
     resetDrafts()
     resetConnectPanel()
+    onClassChange?.(value)
     void reload(value)
   }
 
