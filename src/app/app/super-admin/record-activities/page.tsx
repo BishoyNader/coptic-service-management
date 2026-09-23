@@ -8,12 +8,12 @@ import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import { listActiveClasses } from "@/services/classes-service"
 import { getClassDeskData } from "@/services/class-desk-service"
+import { getPastMinistryFridays } from "@/services/study-year-service"
 import { SuperAdminClassDesk } from "@/components/app/super-admin-class-desk"
 
 export const metadata: Metadata = { title: "دكة الصف" }
 
 const SELF_HISTORY_DAYS = 14
-const MIN_DATE_DAYS = 90
 
 export default async function SuperAdminRecordActivitiesPage() {
   const supabase = await createClient()
@@ -23,10 +23,10 @@ export default async function SuperAdminRecordActivitiesPage() {
   const admin = createAdminClient()
   const todayInstant = getServerNow()
   const cairoToday = cairoDateString(todayInstant)
-  const minDate = cairoDateString(new Date(todayInstant.getTime() - MIN_DATE_DAYS * 86_400_000))
   const historySince = cairoDateString(
     new Date(todayInstant.getTime() - SELF_HISTORY_DAYS * 86_400_000)
   )
+  const fridays = await getPastMinistryFridays(admin, cairoToday)
 
   const classes = await listActiveClasses(admin)
   const first = classes[0] ?? null
@@ -50,7 +50,7 @@ export default async function SuperAdminRecordActivitiesPage() {
         initialDesk={desk}
         currentUserId={profile.id}
         today={cairoToday}
-        minDate={minDate}
+        fridays={fridays}
       />
     </div>
   )

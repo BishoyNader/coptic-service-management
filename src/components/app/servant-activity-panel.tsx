@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
+import { fridayArabicLabel } from "@/lib/friday"
 import {
   recordServantActivityAction,
   removeServantActivityAction,
@@ -29,7 +30,9 @@ type ServantActivityPanelProps = {
   activities: ActivityEntry[]
   history: HistoryEntry[]
   cairoToday: string
-  minDate: string
+  /** Selectable ministry Fridays (newest-first) — the only days an activity
+   * may be recorded on. Never a future Friday, never a non-Friday date. */
+  fridays: string[]
   /** Subject servant id when recording on behalf of another servant (super admin). */
   servantId?: string
   /** Read-only view (servant self): records are made by the super admin only. */
@@ -56,23 +59,24 @@ const ICONS: Record<string, LucideIcon> = {
 /**
  * Simple, mobile-friendly servant activity recorder.
  *
- * A servant picks the Cairo date of the activity (defaults to today, never
- * in the future) and toggles each activity. Records for PAST dates are
- * immutable; only today's records can be undone — the server enforces this
- * even though the UI hides the removal affordance.
+ * A super admin picks the ministry FRIDAY of the activity (defaults to the
+ * most recent past Friday, never a future Friday) and toggles each activity.
+ * Records for PAST Fridays are immutable; only the current Friday's records
+ * can be undone — the server enforces this even though the UI hides the
+ * removal affordance.
  */
 export function ServantActivityPanel({
   activities,
   history,
   cairoToday,
-  minDate,
+  fridays,
   servantId,
   readOnly = false,
   draftMode = false,
   onDraftToggle,
   onChanged,
 }: ServantActivityPanelProps) {
-  const [date, setDate] = useState(cairoToday)
+  const [date, setDate] = useState(fridays[0] ?? cairoToday)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -86,6 +90,7 @@ export function ServantActivityPanel({
 
   function toggle(activityId: string, recorded: boolean) {
     if (readOnly) return
+    if (fridays.length === 0) return
     if (!recorded && date > cairoToday) return
     if (draftMode) {
       onDraftToggle?.(activityId, recorded, date)
@@ -115,23 +120,32 @@ export function ServantActivityPanel({
           htmlFor="servant-activity-date"
           className="text-sm font-medium text-muted-foreground"
         >
-          تاريخ النشاط
+          جمعة النشاط
         </label>
-        <input
-          id="servant-activity-date"
-          type="date"
-          value={date}
-          min={minDate}
-          max={cairoToday}
-          onChange={(e) => setDate(e.target.value || cairoToday)}
-          className="rounded-lg border bg-card px-3 py-2 text-sm"
-        />
+        {fridays.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">
+            لا توجد أيام جمعة سابقة متاحة للتسجيل
+          </p>
+        ) : (
+          <select
+            id="servant-activity-date"
+            value={date}
+            onChange={(e) => setDate(e.target.value || cairoToday)}
+            className="rounded-lg border bg-card px-3 py-2 text-sm"
+          >
+            {fridays.map((f) => (
+              <option key={f} value={f}>
+                {fridayArabicLabel(f)}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-2">
         {activities.map((activity) => {
           const recorded = recordedIds.has(activity.id)
-          const disabled = (recorded && !isToday) || readOnly
+          const disabled = (recorded && !isToday) || readOnly || fridays.length === 0
           const Icon = activity.icon ? ICONS[activity.icon] : ClipboardList
 
           return (
@@ -190,7 +204,8 @@ export function ServantActivityPanel({
         </p>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          المشاركات المسجلة في تاريخ سابق لا يمكن تعديلها — يمكن إلغاء تسجيل اليوم فقط.
+          أنشطة الخدام تُسجَّل في أيام الجمعة السابقة فقط — المشاركات المسجلة في جمعة سابقة لا
+          يمكن تعديلها، ويمكن إلغاء تسجيل جمعة اليوم فقط.
         </p>
       )}
     </div>

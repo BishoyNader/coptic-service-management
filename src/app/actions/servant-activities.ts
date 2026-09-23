@@ -8,6 +8,7 @@ import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import { isUuid } from "@/lib/validation"
 import { getServantDayData, type ServantDayData } from "@/services/servant-day-service"
+import { getPastMinistryFridays } from "@/services/study-year-service"
 
 export type ServantActivityResult = {
   ok: boolean
@@ -74,9 +75,9 @@ async function resolveSubjectServant(
 
 /**
  * Servant records their own participation in an active SERVANT activity — or,
- * for a super admin, the participation of any active servant. The date is the
- * Cairo calendar date of the activity (today by default), never a future date.
- * Duplicate submissions are idempotent.
+ * for a super admin, the participation of any active servant. The date is a
+ * ministry Friday of a Study Year, on-or-before today (never any other day,
+ * never a future Friday). Duplicate submissions are idempotent.
  */
 export async function recordServantActivityAction(
   activityId: string,
@@ -97,10 +98,15 @@ export async function recordServantActivityAction(
 
   const cairoToday = cairoDateString(getServerNow())
   if (date > cairoToday) {
-    return { ok: false, message: "لا يمكن تسجيل نشاط في تاريخ مستقبلي" }
+    return { ok: false, message: "لا يمكن تسجيل نشاط في جمعة مستقبلية" }
   }
 
   const admin = createAdminClient()
+
+  const pastFridays = new Set(await getPastMinistryFridays(admin, cairoToday))
+  if (!pastFridays.has(date)) {
+    return { ok: false, message: "الأنشطة تُسجَّل في أيام الجمعة (السابقة) فقط" }
+  }
 
   const subjectId = await resolveSubjectServant(admin, actor, servantId)
   if (!subjectId) return { ok: false, message: "غير مصرح" }

@@ -56,14 +56,15 @@ export function SuperAdminClassDesk({
   initialDesk,
   currentUserId,
   today,
-  minDate,
+  fridays,
 }: {
   classes: ClassOption[]
   initialClassId: string | null
   initialDesk: ClassDeskData | null
   currentUserId: string
   today: string
-  minDate: string
+  /** Selectable past ministry Fridays (newest-first) for servant activities. */
+  fridays: string[]
 }) {
   const [classId, setClassId] = useState<string | null>(initialClassId)
   const [desk, setDesk] = useState<ClassDeskData | null>(initialDesk)
@@ -397,7 +398,7 @@ export function SuperAdminClassDesk({
                     key={servant.profileId}
                     servant={servant}
                     today={today}
-                    minDate={minDate}
+                    fridays={fridays}
                     present={effectivePresent(servant)}
                     history={effectiveHistory(servant)}
                     onToggleAttendance={() => toggleServantAttendance(servant)}
@@ -479,7 +480,7 @@ export function SuperAdminClassDesk({
 function ServantDeskCard({
   servant,
   today,
-  minDate,
+  fridays,
   present,
   history,
   onToggleAttendance,
@@ -487,7 +488,7 @@ function ServantDeskCard({
 }: {
   servant: DeskServant
   today: string
-  minDate: string
+  fridays: string[]
   present: boolean
   history: ServantDayData["history"]
   onToggleAttendance: () => void
@@ -542,7 +543,7 @@ function ServantDeskCard({
             activities={servant.day.activities}
             history={history}
             cairoToday={today}
-            minDate={minDate}
+            fridays={fridays}
             servantId={servant.profileId}
             draftMode
             onDraftToggle={onActivityToggle}

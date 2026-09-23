@@ -82,6 +82,25 @@ export function getStudyYearFridays(year: Pick<StudyYear, "start_date" | "end_da
   return fridaySchedule(year.start_date, year.end_date)
 }
 
+/**
+ * Every ministry Friday on-or-before `today`, across all Study Years —
+ * newest-first, each Friday once. This is the exact set of days a servant
+ * activity may be recorded on: a ministry Friday, never a future one.
+ */
+export async function getPastMinistryFridays(
+  admin: SupabaseAdminClient,
+  today: string
+): Promise<string[]> {
+  const years = await listStudyYears(admin)
+  const set = new Set<string>()
+  for (const year of years) {
+    for (const f of getStudyYearFridays(year)) {
+      if (f <= today) set.add(f)
+    }
+  }
+  return [...set].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+}
+
 /** Every Study Year, oldest first (for the management screen). */
 export async function listStudyYears(admin: SupabaseAdminClient): Promise<StudyYear[]> {
   const { data } = await admin

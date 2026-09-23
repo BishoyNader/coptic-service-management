@@ -27,7 +27,7 @@ export type MyDayAttendance = {
  */
 export function ServantMyDay({
   cairoToday,
-  minDate,
+  fridays,
   todayAttendance,
   recentAttendance,
   activities,
@@ -40,7 +40,8 @@ export function ServantMyDay({
 }: {
   profileId: string
   cairoToday: string
-  minDate: string
+  /** Selectable past ministry Fridays (newest-first) for servant activities. */
+  fridays: string[]
   todayAttendance: MyDayAttendance[]
   recentAttendance: MyDayAttendance[]
   activities: { id: string; name: string; icon: string | null }[]
@@ -173,7 +174,7 @@ export function ServantMyDay({
             activities={activities}
             history={history}
             cairoToday={cairoToday}
-            minDate={minDate}
+            fridays={fridays}
             servantId={servantId}
             readOnly={readOnly}
             onChanged={onChanged}

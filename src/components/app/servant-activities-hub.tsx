@@ -27,7 +27,7 @@ export function ServantActivitiesHub({
   currentUserId,
   isSuperAdmin,
   cairoToday,
-  minDate,
+  fridays,
   servants,
   initialServantId,
   initialDay,
@@ -36,7 +36,8 @@ export function ServantActivitiesHub({
   currentUserId: string
   isSuperAdmin: boolean
   cairoToday: string
-  minDate: string
+  /** Selectable past ministry Fridays (newest-first) for servant activities. */
+  fridays: string[]
   servants: HubServant[]
   initialServantId: string | null
   initialDay: ServantDayData | null
@@ -115,7 +116,7 @@ export function ServantActivitiesHub({
             profileId={subjectId}
             servantId={subjectId}
             cairoToday={cairoToday}
-            minDate={minDate}
+            fridays={fridays}
             todayAttendance={day.todayAttendance}
             recentAttendance={day.recentAttendance}
             activities={day.activities}

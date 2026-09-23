@@ -7,13 +7,13 @@ import { ROLES } from "@/lib/roles"
 import { cairoDateString } from "@/lib/cairo"
 import { getServerNow } from "@/services/attendance-service"
 import { getServantDayData } from "@/services/servant-day-service"
+import { getPastMinistryFridays } from "@/services/study-year-service"
 import { getScoringBoardData, getServantClassId } from "@/services/member-scoring-service"
 import { ServantActivitiesHub, type HubServant } from "@/components/app/servant-activities-hub"
 
 export const metadata: Metadata = { title: "الأنشطة" }
 
 const SELF_HISTORY_DAYS = 14
-const MIN_DATE_DAYS = 90
 
 export default async function ServantActivitiesPage() {
   const supabase = await createClient()
@@ -25,10 +25,10 @@ export default async function ServantActivitiesPage() {
   const admin = createAdminClient()
   const todayInstant = getServerNow()
   const cairoToday = cairoDateString(todayInstant)
-  const minDate = cairoDateString(new Date(todayInstant.getTime() - MIN_DATE_DAYS * 86_400_000))
   const historySince = cairoDateString(
     new Date(todayInstant.getTime() - SELF_HISTORY_DAYS * 86_400_000)
   )
+  const fridays = await getPastMinistryFridays(admin, cairoToday)
 
   const isSuperAdmin = profile.role === ROLES.SUPER_ADMIN
 
@@ -76,7 +76,7 @@ export default async function ServantActivitiesPage() {
         currentUserId={profile.id}
         isSuperAdmin={isSuperAdmin}
         cairoToday={cairoToday}
-        minDate={minDate}
+        fridays={fridays}
         servants={servants}
         initialServantId={initialServantId}
         initialDay={initialServerDay}

@@ -17,6 +17,7 @@ import {
   type DeskSaveSummary,
 } from "@/services/class-desk-service"
 import { removeDeskAttendanceRecord } from "@/services/attendance-service"
+import { getPastMinistryFridays } from "@/services/study-year-service"
 
 const SELF_HISTORY_DAYS = 14
 
@@ -239,6 +240,9 @@ export async function saveClassDeskAction(input: DeskSaveInput): Promise<SaveCla
     return { ok: false, message: "لا يمكن الحفظ في تاريخ مستقبلي" }
   }
 
+  const admin = createAdminClient()
+  const pastFridays = new Set(await getPastMinistryFridays(admin, cairoDateString(getServerNow())))
+
   const servantAttendance = (Array.isArray(input.servantAttendance) ? input.servantAttendance : [])
     .filter((r) => r && isUuid(r.profileId) && typeof r.present === "boolean")
     .slice(0, MAX_SERVANT_ROWS)
@@ -253,6 +257,10 @@ export async function saveClassDeskAction(input: DeskSaveInput): Promise<SaveCla
         typeof r.recorded === "boolean"
     )
     .slice(0, MAX_ACTIVITY_ROWS)
+
+  if (servantActivities.some((r) => !pastFridays.has(r.date))) {
+    return { ok: false, message: "أنشطة الخدام تُسجَّل في أيام الجمعة (السابقة) فقط" }
+  }
 
   const memberAttendance = (Array.isArray(input.memberAttendance) ? input.memberAttendance : [])
     .filter(
@@ -270,7 +278,7 @@ export async function saveClassDeskAction(input: DeskSaveInput): Promise<SaveCla
     )
     .slice(0, MAX_SCORE_ROWS)
 
-  const summary = await applyDeskSave(createAdminClient(), actorId, {
+  const summary = await applyDeskSave(admin, actorId, {
     classId: input.classId,
     date: input.date,
     servantAttendance,
