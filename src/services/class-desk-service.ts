@@ -43,12 +43,13 @@ async function listClassServants(
   admin: SupabaseAdminClient,
   classId: string
 ): Promise<{ id: string; full_name: string }[]> {
-  // The embedded `servants!inner(id)` select is required for the
+  // The embedded `servants!inner(profile_id)` select is required for the
   // `servants.class_id` filter to be applied — PostgREST can only filter on a
-  // to-one relation that is present in the select list.
+  // to-one relation that is present in the select list. `profile_id` is the
+  // relation's primary key; the table has no `id` column.
   const { data } = await admin
     .from("profiles")
-    .select("id, full_name, servants!inner(id)")
+    .select("id, full_name, servants!inner(profile_id)")
     .eq("role", ROLES.SERVANT)
     .eq("status", "ACTIVE")
     .eq("servants.class_id", classId)
@@ -74,7 +75,7 @@ export async function listConnectableServants(
 ): Promise<ConnectableServant[]> {
   const { data } = await admin
     .from("profiles")
-    .select("id, full_name, servants!inner(id, class_id, classes(name))")
+    .select("id, full_name, servants!inner(profile_id, class_id, classes(name))")
     .eq("role", ROLES.SERVANT)
     .eq("status", "ACTIVE")
 

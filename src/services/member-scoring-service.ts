@@ -86,7 +86,7 @@ export async function listActiveMembers(
   classId?: string | null
 ): Promise<{ id: string; full_name: string }[]> {
   const selectCols = classId
-    ? "id, full_name, served_members!inner(id)"
+    ? "id, full_name, served_members!inner(profile_id)"
     : "id, full_name"
   let query = admin
     .from("profiles")
