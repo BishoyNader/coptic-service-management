@@ -1,11 +1,25 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { CalendarCheck, Check, ChevronDown, Loader2, Save, Users } from "lucide-react"
+import {
+  CalendarCheck,
+  Check,
+  ChevronDown,
+  Link2,
+  Loader2,
+  Save,
+  Users,
+  X,
+} from "lucide-react"
 import { cn } from "cn"
 import { toast } from "sonner"
 import { formatArabicDate } from "@/lib/dates"
-import { getClassDeskAction, saveClassDeskAction } from "@/app/actions/class-desk"
+import {
+  adminConnectServantsToClassAction,
+  getClassDeskAction,
+  listConnectServantsAction,
+  saveClassDeskAction,
+} from "@/app/actions/class-desk"
 import { ServantActivityPanel } from "@/components/app/servant-activity-panel"
 import {
   ServantScoringBoard,
@@ -13,6 +27,7 @@ import {
 } from "@/components/app/servant-scoring-board"
 import type {
   ClassDeskData,
+  ConnectableServant,
   DeskServant,
   DeskSaveInput,
 } from "@/services/class-desk-service"
@@ -60,11 +75,58 @@ export function SuperAdminClassDesk({
   const [saving, setSaving] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // "ربط خدام" panel — connect unassigned servants to the selected class.
+  const [connectList, setConnectList] = useState<ConnectableServant[] | null>(null)
+  const [connectLoading, setConnectLoading] = useState(false)
+  const [connectSelected, setConnectSelected] = useState<Record<string, boolean>>({})
+  const [connecting, setConnecting] = useState(false)
+
   const resetDrafts = useCallback(() => {
     setServantAttendance({})
     setActivityDrafts({})
     setBoardDrafts(null)
   }, [])
+
+  const resetConnectPanel = useCallback(() => {
+    setConnectList(null)
+    setConnectSelected({})
+  }, [])
+
+  const loadConnectList = useCallback(async (id: string) => {
+    if (connectList) return
+    setConnectLoading(true)
+    const res = await listConnectServantsAction(id)
+    setConnectLoading(false)
+    if (res.ok) {
+      setConnectList(res.data)
+      setConnectSelected({})
+    } else {
+      toast.error(res.message)
+    }
+  }, [connectList])
+
+  const toggleConnect = (profileId: string) => {
+    setConnectSelected((prev) => ({ ...prev, [profileId]: !prev[profileId] }))
+  }
+
+  const handleConnect = async () => {
+    if (!classId || connecting) return
+    const ids = Object.entries(connectSelected)
+      .filter(([, v]) => v)
+      .map(([id]) => id)
+    if (ids.length === 0) return
+    setConnecting(true)
+    const res = await adminConnectServantsToClassAction(ids, classId)
+    setConnecting(false)
+    if (res.ok) {
+      toast.success(res.message)
+      resetConnectPanel()
+      setRefreshKey((k) => k + 1)
+      void reload(classId)
+    } else {
+      toast.error(res.message)
+    }
+  }
 
   const reload = useCallback(
     async (id: string) => {
@@ -84,6 +146,7 @@ export function SuperAdminClassDesk({
   const handleClassChange = (value: string) => {
     if (!value || value === classId) return
     resetDrafts()
+    resetConnectPanel()
     setRefreshKey((k) => k + 1)
     void reload(value)
   }
@@ -290,18 +353,43 @@ export function SuperAdminClassDesk({
         <>
           {/* Servants of the class */}
           <section aria-label="خدام الصف" className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="font-heading font-bold">خدام الصف</h2>
-              <span className="rounded-full bg-coptic-teal/10 px-3 py-1 text-xs font-bold text-coptic-teal">
-                {desk.servants.length} خادم
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-coptic-teal/10 px-3 py-1 text-xs font-bold text-coptic-teal">
+                  {desk.servants.length} خادم
+                </span>
+                <button
+                  type="button"
+                  data-testid="class-desk-connect-toggle"
+                  onClick={() => void loadConnectList(classId)}
+                  className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <Link2 className="size-3.5" />
+                  ربط خدام
+                </button>
+              </div>
             </div>
 
+            {connectList ? (
+              <ConnectServantsPanel
+                servants={connectList}
+                loading={connectLoading}
+                selected={connectSelected}
+                connecting={connecting}
+                onToggle={toggleConnect}
+                onConnect={() => void handleConnect()}
+                onCancel={resetConnectPanel}
+              />
+            ) : null}
+
             {desk.servants.length === 0 ? (
-              <EmptyHint>
-                <Users className="size-5" />
-                <p>لا يوجد خدام في هذا الصف — عيّن صف لكل خادم من صفحة الخدام</p>
-              </EmptyHint>
+              connectList ? null : (
+                <EmptyHint>
+                  <Users className="size-5" />
+                  <p>لا يوجد خدام مرتبطين بهذا الصف — اضغط «ربط خدام» لإنشاء الصلة</p>
+                </EmptyHint>
+              )
             ) : (
               <div className="space-y-3">
                 {desk.servants.map((servant) => (
@@ -461,6 +549,110 @@ function ServantDeskCard({
           />
         </div>
       </details>
+    </div>
+  )
+}
+
+function ConnectServantsPanel({
+  servants,
+  loading,
+  selected,
+  connecting,
+  onToggle,
+  onConnect,
+  onCancel,
+}: {
+  servants: ConnectableServant[]
+  loading: boolean
+  selected: Record<string, boolean>
+  connecting: boolean
+  onToggle: (profileId: string) => void
+  onConnect: () => void
+  onCancel: () => void
+}) {
+  const selectedCount = Object.values(selected).filter(Boolean).length
+
+  return (
+    <div
+      data-testid="class-desk-connect-panel"
+      className="rounded-2xl border border-dashed border-coptic-teal/40 bg-coptic-teal/5 p-4"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <Link2 className="size-4 text-coptic-teal" />
+          ربط خدام بالصف
+        </p>
+        <button
+          type="button"
+          data-testid="class-desk-connect-close"
+          onClick={onCancel}
+          aria-label="إغلاق"
+          className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-card px-4 py-6 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          جاري تحميل الخدام…
+        </div>
+      ) : servants.length === 0 ? (
+        <p className="mt-3 rounded-xl bg-card px-4 py-6 text-center text-sm text-muted-foreground">
+          كل الخدام النشطين مرتبطين بالفعل بهذا الصف
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 space-y-1.5">
+            {servants.map((s) => (
+              <label
+                key={s.profileId}
+                className="flex cursor-pointer items-center gap-3 rounded-xl bg-card px-3 py-2.5 text-sm ring-1 ring-foreground/5 hover:bg-secondary/60"
+              >
+                <input
+                  type="checkbox"
+                  data-testid={`class-desk-connect-servant-${s.profileId}`}
+                  checked={!!selected[s.profileId]}
+                  onChange={() => onToggle(s.profileId)}
+                  className="size-4 accent-coptic-teal"
+                />
+                <span className="min-w-0 flex-1 truncate font-semibold">{s.fullName}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
+                  {s.currentClassName ? `حاليًا: ${s.currentClassName}` : "بدون صف"}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              data-testid="class-desk-connect-save"
+              disabled={selectedCount === 0 || connecting}
+              onClick={onConnect}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors",
+                selectedCount > 0 && !connecting
+                  ? "bg-coptic-teal text-primary-foreground hover:opacity-90"
+                  : "cursor-default bg-muted text-muted-foreground"
+              )}
+            >
+              {connecting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  جاري الربط…
+                </>
+              ) : (
+                <>
+                  <Link2 className="size-4" />
+                  ربط {selectedCount > 0 ? selectedCount : ""} خادم
+                </>
+              )}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

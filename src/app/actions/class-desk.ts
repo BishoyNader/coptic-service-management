@@ -10,7 +10,9 @@ import { logAudit } from "@/services/auth-service"
 import {
   applyDeskSave,
   getClassDeskData,
+  listConnectableServants,
   type ClassDeskData,
+  type ConnectableServant,
   type DeskSaveInput,
   type DeskSaveSummary,
 } from "@/services/class-desk-service"
@@ -119,6 +121,85 @@ export async function adminSetServantClassAction(
   })
 
   return { ok: true, message: classId ? "تم تحديث صف الخادم ✓" : "تم إزالة الصف" }
+}
+
+export type ListConnectServantsResult =
+  | { ok: true; data: ConnectableServant[] }
+  | { ok: false; message: string }
+
+/**
+ * Super Admin only: active servants that can still be connected to a class
+ * (servants without a class, or assigned to a different one).
+ */
+export async function listConnectServantsAction(
+  classId: string
+): Promise<ListConnectServantsResult> {
+  const actorId = await requireSuperAdmin()
+  if (!actorId) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(classId)) return { ok: false, message: "الصف غير صحيح" }
+
+  const data = await listConnectableServants(createAdminClient(), classId)
+  return { ok: true, data }
+}
+
+const MAX_BATCH_CONNECT = 200
+
+export type ConnectServantsResult = { ok: boolean; message: string; connected?: number }
+
+/**
+ * Super Admin only: connect a batch of servants to one class in a single call.
+ * Only active SERVANT profiles are accepted; the rest are ignored.
+ */
+export async function adminConnectServantsToClassAction(
+  servantIds: string[],
+  classId: string
+): Promise<ConnectServantsResult> {
+  const actorId = await requireSuperAdmin()
+  if (!actorId) return { ok: false, message: "غير مصرح" }
+  if (!isUuid(classId)) return { ok: false, message: "الصف غير صحيح" }
+  const ids = [...new Set(servantIds.filter((v) => isUuid(v)))].slice(0, MAX_BATCH_CONNECT)
+  if (ids.length === 0) return { ok: false, message: "اختر خادمًا واحدًا على الأقل" }
+
+  const admin = createAdminClient()
+
+  const { data: cls } = await admin
+    .from("classes")
+    .select("id, name")
+    .eq("id", classId)
+    .eq("is_active", true)
+    .maybeSingle()
+  if (!cls) return { ok: false, message: "الصف غير موجود" }
+
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", ids)
+    .eq("role", ROLES.SERVANT)
+    .eq("status", "ACTIVE")
+
+  const valid = (profiles ?? []).map((p) => p.id as string)
+  if (valid.length === 0) return { ok: false, message: "لا يوجد خدام صالحون للربط" }
+
+  const { error } = await admin
+    .from("servants")
+    .update({ class_id: classId })
+    .in("profile_id", valid)
+  if (error) return { ok: false, message: "تعذر ربط الخدام بالصف" }
+
+  await logAudit(admin, {
+    actorId,
+    action: "SERVANTS_CLASS_CONNECTED",
+    entity: "CLASS",
+    entityId: classId,
+    metadata: {
+      class_id: classId,
+      class_name: cls.name,
+      servant_ids: valid,
+      servants: (profiles ?? []).map((p) => p.full_name as string).join("، "),
+    },
+  })
+
+  return { ok: true, message: `تم ربط ${valid.length} خادم بالصف ✓`, connected: valid.length }
 }
 
 // --- Batch save -------------------------------------------------------------

@@ -56,6 +56,54 @@ async function listClassServants(
   return (data ?? []) as unknown as { id: string; full_name: string }[]
 }
 
+export type ConnectableServant = {
+  profileId: string
+  fullName: string
+  currentClassId: string | null
+  currentClassName: string | null
+}
+
+/**
+ * Active servants that can be assigned to a class — every servant NOT already
+ * connected to that class. Each row carries the servant's current class (null
+ * = unassigned) so the caller can show what the assignment would change.
+ */
+export async function listConnectableServants(
+  admin: SupabaseAdminClient,
+  classId: string
+): Promise<ConnectableServant[]> {
+  const { data } = await admin
+    .from("profiles")
+    .select("id, full_name, servants!inner(id, class_id, classes(name))")
+    .eq("role", ROLES.SERVANT)
+    .eq("status", "ACTIVE")
+
+  const rows = (data ?? []) as unknown as Array<{
+    id: string
+    full_name: string
+    servants:
+      | { id: string; class_id: string | null; classes: { name: string } | null }
+      | { id: string; class_id: string | null; classes: { name: string } | null }[]
+      | null
+  }>
+
+  const out: ConnectableServant[] = []
+  for (const row of rows) {
+    const detail = Array.isArray(row.servants) ? row.servants[0] : row.servants
+    if (!detail) continue
+    if (detail.class_id === classId) continue
+    out.push({
+      profileId: row.id,
+      fullName: row.full_name,
+      currentClassId: detail.class_id,
+      currentClassName: detail.classes?.name ?? null,
+    })
+  }
+
+  out.sort((a, b) => a.fullName.localeCompare(b.fullName, "ar"))
+  return out
+}
+
 export async function getClassDeskData(
   admin: SupabaseAdminClient,
   classId: string,
