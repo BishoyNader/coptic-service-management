@@ -28,6 +28,7 @@ type FieldErrors = {
   dateOfBirth?: string
   fatherPhone?: string
   motherPhone?: string
+  memberClass?: string
 }
 
 type Success = {
@@ -138,6 +139,15 @@ export function AdminUserForm({
     if (motherPhone && !/^\+?[0-9]{10,15}$/.test(motherPhone.trim())) {
       next.motherPhone = "رقم غير صحيح"
       ok = false
+    }
+    if (isMember) {
+      if (classes.length === 0) {
+        next.memberClass = "لا توجد صفوف بعد — أنشئ صفًا أولًا"
+        ok = false
+      } else if (!memberClassId) {
+        next.memberClass = "يجب اختيار الصف للمخدوم"
+        ok = false
+      }
     }
     setErrors(next)
     return ok
@@ -415,7 +425,13 @@ export function AdminUserForm({
                     />
                   </div>
 
-                  <ClassSelect classes={classes} value={memberClassId} onChange={setMemberClassId} />
+                  <ClassSelect
+                    classes={classes}
+                    value={memberClassId}
+                    onChange={setMemberClassId}
+                    required
+                    error={errors.memberClass}
+                  />
                 </>
               )}
 
@@ -495,27 +511,43 @@ function ClassSelect({
   classes,
   value,
   onChange,
+  required = false,
+  error,
 }: {
   classes: { id: string; name: string }[]
   value: string
   onChange: (value: string) => void
+  required?: boolean
+  error?: string
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor="au-memberClass">الصف (اختياري)</Label>
-      <select
-        id="au-memberClass"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="flex h-11 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+      <Label
+        htmlFor="au-memberClass"
+        className={required ? "after:ms-1 after:text-destructive after:content-['*']" : undefined}
       >
-        <option value="">بدون صنف</option>
-        {classes.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+        الصف{required ? "" : " (اختياري)"}
+      </Label>
+      {required && classes.length === 0 ? (
+        <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          لا توجد صفوف بعد — أنشئ صفًا أولًا
+        </p>
+      ) : (
+        <select
+          id="au-memberClass"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex h-11 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+        >
+          <option value="">{required ? "اختار الصف…" : "بدون صنف"}</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   )
 }

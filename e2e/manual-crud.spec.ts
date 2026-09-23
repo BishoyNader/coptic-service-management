@@ -26,8 +26,18 @@ async function openAddAndFill(
   await page.locator("#au-password").fill(opts.password ?? "password123")
   await page.locator("#au-confirmPassword").fill(opts.password ?? "password123")
   await page.getByRole("button", { name: "التالي" }).click()
+  // Served members are required to belong to a class — pick one when the
+  // form offers real class options (servants keep "بدون صنف").
+  const classSelect = page.locator("#au-memberClass")
+  if ((await classSelect.count()) > 0) {
+    if ((await classSelect.locator("option").count()) > 1) {
+      await classSelect.selectOption({ index: 1 })
+    }
+  }
   await page.getByRole("button", { name: "إضافة الحساب" }).click()
 }
+
+const E2E_CLASS_NAME = "صف اختبار E2E"
 
 test.describe("PHASE 2 — Manual admin CRUD", () => {
   let admin: SupabaseClient
@@ -39,6 +49,11 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
     admin = createSupabaseAdmin()
     adminSeed = await createSeedAdmin(admin, "SERVANT", randomPhone(), "testadmin123")
     superSeed = await createSeedAdmin(admin, "SUPER_ADMIN", randomPhone(), "testadmin123")
+    // A served member must belong to a class, so the add-member form requires
+    // one. Ensure the seeded class exists for the UI flows below.
+    await admin
+      .from("classes")
+      .upsert({ name: E2E_CLASS_NAME, sort_order: 1 }, { onConflict: "name" })
   })
 
   test.afterAll(async () => {
@@ -47,6 +62,7 @@ test.describe("PHASE 2 — Manual admin CRUD", () => {
       adminSeed.phone,
       superSeed.phone,
     ])
+    await admin.from("classes").delete().eq("name", E2E_CLASS_NAME)
   })
 
   test("20. Admin can add a مخدوم manually (+ إضافة مخدوم)", async ({ page }) => {

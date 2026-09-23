@@ -11,6 +11,8 @@ import { adminUpdateProfileAction, adminUpdateStatusAction } from "@/app/actions
 import { NileDivider } from "@/components/coptic/brand"
 import { lastFridayOnOrBefore } from "@/lib/friday"
 import { cairoDateString } from "@/lib/cairo"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { listActiveClasses } from "@/services/classes-service"
 
 export const metadata: Metadata = { title: "عرض مستخدم" }
 
@@ -27,7 +29,13 @@ export default async function SuperAdminUserDetailPage({
   const profile = await getProfileById(supabase, id)
   if (!profile) notFound()
 
-  const [codesResult, attendanceResult, scoresResult, memberDetailResult] = await Promise.all([
+  const [
+    codesResult,
+    attendanceResult,
+    scoresResult,
+    memberDetailResult,
+    classes,
+  ] = await Promise.all([
     supabase
       .from("personal_codes")
       .select("code, qr_token")
@@ -48,9 +56,10 @@ export default async function SuperAdminUserDetailPage({
       .limit(50),
     supabase
       .from("served_members")
-      .select("class, notes")
+      .select("class, class_id, notes")
       .eq("profile_id", id)
       .maybeSingle(),
+    listActiveClasses(createAdminClient()),
   ])
 
   const attendance = (attendanceResult.data ?? []) as { id: string; attended_at: string }[]
@@ -87,6 +96,8 @@ export default async function SuperAdminUserDetailPage({
         attendance={attendance}
         scores={scores}
         memberClass={memberDetailResult.data?.class ?? null}
+        memberClassId={memberDetailResult.data?.class_id ?? null}
+        classes={classes}
         onSubmit={adminUpdateProfileAction}
         onChangeStatus={adminUpdateStatusAction}
         currentFriday={lastFridayOnOrBefore(cairoDateString(new Date()))}

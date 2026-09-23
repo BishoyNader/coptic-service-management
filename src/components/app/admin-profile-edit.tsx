@@ -9,21 +9,31 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import type { Profile } from "@/lib/types"
+import { ROLES } from "@/lib/roles"
 import type { ProfileUpdatePayload } from "@/app/actions/profile"
 
 export type AdminProfileSubmit = (
   id: string,
-  payload: ProfileUpdatePayload & { status?: "ACTIVE" | "INACTIVE" }
-) => Promise<{ ok: boolean; message: string }>
+  payload: ProfileUpdatePayload & {
+    status?: "ACTIVE" | "INACTIVE"
+    memberClassId?: string
+  }
+) => Promise<{ ok: boolean; field?: string; message: string }>
 
 export function AdminProfileEdit({
   profile,
   onSubmit,
   onDone,
+  classes = [],
+  memberClassId,
 }: {
   profile: Profile
   onSubmit: AdminProfileSubmit
   onDone: () => void
+  /** Active classes for the served-member class selector (required). */
+  classes?: { id: string; name: string }[]
+  /** The member's current class id, if any. */
+  memberClassId?: string | null
 }) {
   const [pending, setPending] = useState(false)
   const router = useRouter()
@@ -33,7 +43,10 @@ export function AdminProfileEdit({
   const [address, setAddress] = useState(profile.address ?? "")
   const [fatherPhone, setFatherPhone] = useState(profile.father_phone ?? "")
   const [motherPhone, setMotherPhone] = useState(profile.mother_phone ?? "")
+  const [selectedClassId, setSelectedClassId] = useState(memberClassId ?? "")
   const [active, setActive] = useState(profile.status === "ACTIVE")
+
+  const isMember = profile.role === ROLES.SERVED_MEMBER
 
   const handleSave = async () => {
     if (!fullName.trim() || fullName.trim().length < 2) {
@@ -42,6 +55,10 @@ export function AdminProfileEdit({
     }
     if (!phone.trim() || !/^\+?[0-9]{10,15}$/.test(phone.trim())) {
       toast.error("اكتب رقم موبايل صحيح")
+      return
+    }
+    if (isMember && !selectedClassId) {
+      toast.error("يجب اختيار الصف للمخدوم")
       return
     }
 
@@ -54,6 +71,7 @@ export function AdminProfileEdit({
       fatherPhone: fatherPhone || undefined,
       motherPhone: motherPhone || undefined,
       status: active ? "ACTIVE" : "INACTIVE",
+      memberClassId: isMember ? selectedClassId : undefined,
     })
     setPending(false)
 
@@ -62,7 +80,7 @@ export function AdminProfileEdit({
       onDone()
       router.refresh()
     } else {
-      toast.error(result.message)
+      toast.error(result.field === "memberClass" ? "يجب اختيار الصف للمخدوم" : result.message)
     }
   }
 
@@ -101,6 +119,36 @@ export function AdminProfileEdit({
           className="h-11 text-base"
         />
       </div>
+
+      {isMember && (
+        <div className="space-y-2">
+          <Label htmlFor="memberClass" className="after:ms-1 after:text-destructive after:content-['*']">
+            الصف
+          </Label>
+          {classes.length === 0 ? (
+            <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              لا توجد صفوف بعد — أنشئ صفًا من صفحة الصفوف أولًا
+            </p>
+          ) : (
+            <select
+              id="memberClass"
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="flex h-11 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            >
+              <option value="">اختار الصف…</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            المخدوم لازم يكون تابع لصف من الصفوف المتاحة
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="address">العنوان</Label>

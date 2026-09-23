@@ -6,6 +6,7 @@ import { updateMyProfile, updateProfileById, updateServantManagedDob } from "@/s
 import {
   createAdminUser,
   adminChangeStatus,
+  updateMemberClass,
   type AdminCreateUserInput,
 } from "@/services/admin-user-service"
 import {
@@ -39,7 +40,11 @@ export async function updateProfileAction(payload: ProfileUpdatePayload) {
 
 export async function adminUpdateProfileAction(
   id: string,
-  payload: ProfileUpdatePayload & { status?: "ACTIVE" | "INACTIVE" }
+  payload: ProfileUpdatePayload & {
+    status?: "ACTIVE" | "INACTIVE"
+    /** Required for SERVED_MEMBER — they must belong to one of the created classes. */
+    memberClassId?: string
+  }
 ) {
   const supabase = await createClient()
   const {
@@ -56,6 +61,28 @@ export async function adminUpdateProfileAction(
 
   if (!adminProfile || !isStaffRole(adminProfile.role)) {
     return { ok: false, message: "غير مصرح" }
+  }
+
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", id)
+    .maybeSingle()
+  if (!target) return { ok: false, message: "الحساب غير موجود" }
+
+  // A served member must always be assigned to a class; resolve/validate the
+  // class before touching the profile so the user is never left half-edited.
+  let classChanged = false
+  let className: string | undefined
+  if (target.role === "SERVED_MEMBER") {
+    if (!payload.memberClassId || !isUuid(payload.memberClassId)) {
+      return { ok: false, field: "memberClass", message: "يجب اختيار الصف للمخدوم" }
+    }
+    const admin = createAdminClient()
+    const clsRes = await updateMemberClass(admin, id, payload.memberClassId)
+    if (!clsRes.ok) return { ok: false, field: "memberClass", message: clsRes.message }
+    classChanged = !!clsRes.changed
+    className = clsRes.className
   }
 
   const result = await updateProfileById(supabase, id, {
@@ -75,7 +102,13 @@ export async function adminUpdateProfileAction(
       action: "PROFILE_UPDATED",
       entity: "PROFILE",
       entityId: id,
-      metadata: { updatedBy: user.id, status: payload.status },
+      metadata: {
+        updatedBy: user.id,
+        status: payload.status,
+        classChanged,
+        memberClassId: payload.memberClassId,
+        memberClass: className,
+      },
     }).catch(() => {})
   }
 
@@ -206,6 +239,13 @@ export async function adminCreateUserAction(
 
   if (role !== ROLES.SERVED_MEMBER && role !== ROLES.SERVANT) {
     return { ok: false, message: "نوع الحساب غير مسموح به" }
+  }
+
+  if (
+    role === ROLES.SERVED_MEMBER &&
+    (!payload.memberClassId || !isUuid(payload.memberClassId))
+  ) {
+    return { ok: false, field: "memberClass", message: "يجب اختيار الصف للمخدوم" }
   }
 
 

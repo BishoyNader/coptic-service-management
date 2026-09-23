@@ -9,6 +9,8 @@ import { AddPrivilegedUserButton } from "@/components/app/add-privileged-user-bu
 import { adminUpdateStatusAction } from "@/app/actions/profile"
 import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { loadMoreUsersAction } from "@/app/actions/listing"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { listActiveClasses } from "@/services/classes-service"
 
 export const metadata: Metadata = { title: "المستخدمين" }
 
@@ -32,6 +34,8 @@ export default async function SuperAdminUsersPage() {
     status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
   }[]
 
+  const classes = await listActiveClasses(createAdminClient())
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -43,7 +47,7 @@ export default async function SuperAdminUsersPage() {
         </div>
         <div className="flex items-center gap-2">
           <AddPrivilegedUserButton />
-          <AddUserButton defaultRole="SERVED_MEMBER" />
+          <AddUserButton defaultRole="SERVED_MEMBER" classes={classes} />
         </div>
       </div>
 

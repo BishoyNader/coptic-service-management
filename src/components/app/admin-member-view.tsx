@@ -30,6 +30,9 @@ type AdminMemberViewProps = {
   attendance: { id: string; attended_at: string }[]
   scores: { id: string; category: string; points: number; session_date: string; note: string | null }[]
   memberClass?: string | null
+  memberClassId?: string | null
+  /** Active classes — when provided the class becomes editable + required. */
+  classes?: { id: string; name: string }[]
   onSubmit: AdminProfileSubmit
   onChangeStatus?: (id: string, status: UserStatus) => Promise<{ ok: boolean; message: string }>
   currentFriday?: string | null
@@ -48,6 +51,8 @@ export function AdminMemberView({
   attendance,
   scores,
   memberClass,
+  memberClassId,
+  classes,
   onSubmit,
   onChangeStatus,
   currentFriday,
@@ -162,7 +167,13 @@ export function AdminMemberView({
 
       {editing ? (
         <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
-          <AdminProfileEdit profile={profile} onSubmit={onSubmit} onDone={() => setEditing(false)} />
+          <AdminProfileEdit
+            profile={profile}
+            onSubmit={onSubmit}
+            onDone={() => setEditing(false)}
+            classes={classes}
+            memberClassId={memberClassId}
+          />
         </div>
       ) : (
         <>

@@ -147,6 +147,56 @@ export async function createAdminUser(
   return { ok: true, userId, code: codes.code, qrToken: codes.qrToken }
 }
 
+export type UpdateMemberClassResult = {
+  ok: boolean
+  message: string
+  changed?: boolean
+  className?: string
+}
+
+/**
+ * Assigns a served member to a class (or moves them to another class).
+ *
+ * Validates the target class exists and is active, then keeps both the FK
+ * (`class_id`) and the legacy free-text `class` column in sync. Every served
+ * member must belong to one of the created classes, so this is a requirement
+ * on both create and update.
+ */
+export async function updateMemberClass(
+  admin: SupabaseAdminClient,
+  profileId: string,
+  classId: string
+): Promise<UpdateMemberClassResult> {
+  const { data: cls } = await admin
+    .from("classes")
+    .select("id, name, is_active")
+    .eq("id", classId)
+    .maybeSingle()
+
+  if (!cls || cls.is_active === false) {
+    return { ok: false, message: "الصف غير موجود" }
+  }
+  const className = (cls.name as string) ?? ""
+
+  const { data: detail } = await admin
+    .from("served_members")
+    .select("profile_id, class_id")
+    .eq("profile_id", profileId)
+    .maybeSingle()
+
+  if (detail && detail.class_id === classId) {
+    return { ok: true, message: "تم تحديث البيانات بنجاح ✓", changed: false, className }
+  }
+
+  const { error } = await admin.from("served_members").upsert(
+    { profile_id: profileId, class_id: classId, class: className },
+    { onConflict: "profile_id" }
+  )
+
+  if (error) return { ok: false, message: "حدث خطأ أثناء حفظ الصف" }
+  return { ok: true, message: "تم تحديث البيانات بنجاح ✓", changed: true, className }
+}
+
 /**
  * Admin change account status (ACTIVE / INACTIVE / ARCHIVED).
  * Never hard-deletes; historical data stays associated with the profile.
