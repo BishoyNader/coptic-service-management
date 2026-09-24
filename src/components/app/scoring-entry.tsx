@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CalendarPlus, Save, Star, Loader2, Plus } from "lucide-react"
+import { CalendarPlus, Save, Star, Loader2, Plus, Check } from "lucide-react"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import {
 import { recordChildAttendanceAction } from "@/app/actions/children"
 import type { ScorableMember, WeeklyEntryState } from "@/services/scoring-service"
 import type { ScoringCategory } from "@/lib/constants"
+import type { AttendanceType } from "@/lib/types"
 
 function cairoToday(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -54,10 +55,12 @@ export function ScoringEntry({
   const [state, setState] = useState<WeeklyEntryState | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [addingType, setAddingType] = useState<"CHURCH" | "SERVICE" | null>(null)
+  const [savingAttendance, setSavingAttendance] = useState(false)
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false)
-  const [attendanceType, setAttendanceType] = useState<"CHURCH" | "SERVICE" | null>(null)
-  const [attendanceValue, setAttendanceValue] = useState(0)
+  const [attendanceDraft, setAttendanceDraft] = useState<{
+    CHURCH: boolean
+    SERVICE: boolean
+  }>({ CHURCH: false, SERVICE: false })
 
   const [commitment, setCommitment] = useState(0)
   const [serviceCommitment, setServiceCommitment] = useState(0)
@@ -152,31 +155,51 @@ export function ScoringEntry({
     }
   }
 
-  const handleAddAttendance = async (type: "CHURCH" | "SERVICE", points: number) => {
-    if (!memberId || !weekDate) return
-    setAddingType(type)
-    setAttendanceDialogOpen(false)
-    const res = await recordChildAttendanceAction(memberId, type, weekDate, points)
-    setAddingType(null)
-    await load(memberId, weekDate)
-    if (res.ok || res.duplicate) {
-      toast[res.ok ? "success" : "info"](res.message)
-      router.refresh()
-    } else {
-      toast.error(res.message)
-    }
-  }
-
   const openAttendanceDialog = (type: "CHURCH" | "SERVICE") => {
-    const category: ScoringCategory =
-      type === "CHURCH" ? "CHURCH_ATTENDANCE" : "SERVICE_ATTENDANCE"
-    setAttendanceValue(Math.min(cfg(category), 10))
-    setAttendanceType(type)
+    setAttendanceDraft({
+      CHURCH: type === "CHURCH" || (state?.dayAttendance.church.present ?? false),
+      SERVICE: type === "SERVICE" || (state?.dayAttendance.service.present ?? false),
+    })
     setAttendanceDialogOpen(true)
   }
 
-  const attendanceCategory: ScoringCategory =
-    attendanceType === "CHURCH" ? "CHURCH_ATTENDANCE" : "SERVICE_ATTENDANCE"
+  /** How many points a manual attendance entry earns (the configured rule value). */
+  const defaultAttendancePoints = (type: AttendanceType): number => {
+    const category: ScoringCategory =
+      type === "CHURCH" ? "CHURCH_ATTENDANCE" : "SERVICE_ATTENDANCE"
+    const configured = Number(cfg(category)) || 0
+    return Math.min(Math.max(0, Math.round(configured)), 10)
+  }
+
+  /**
+   * Writes attendance for every service the admin marked as attended. Already-
+   * recorded services are skipped so confirmation never re-records a duplicate.
+   */
+  const handleSaveAttendance = async () => {
+    if (!memberId || !weekDate) return
+    const targets: AttendanceType[] = []
+    if (attendanceDraft.CHURCH && !state?.dayAttendance.church.present) targets.push("CHURCH")
+    if (attendanceDraft.SERVICE && !state?.dayAttendance.service.present) targets.push("SERVICE")
+    if (targets.length === 0) {
+      setAttendanceDialogOpen(false)
+      return
+    }
+    setSavingAttendance(true)
+    const results = await Promise.all(
+      targets.map((type) =>
+        recordChildAttendanceAction(memberId, type, weekDate, defaultAttendancePoints(type))
+      )
+    )
+    setSavingAttendance(false)
+    setAttendanceDialogOpen(false)
+    await load(memberId, weekDate)
+    const failures = results.filter((r) => !r.ok && !r.duplicate)
+    if (results.some((r) => r.ok || r.duplicate)) {
+      toast.success(failures.length > 0 ? "تم تسجيل الحضور جزئياً" : "تم تسجيل الحضور")
+      router.refresh()
+    }
+    if (failures.length > 0) toast.error(failures[0].message)
+  }
 
   return (
     <div className="space-y-4">
@@ -266,13 +289,9 @@ export function ScoringEntry({
                     className="gap-1 text-xs"
                     aria-label="تسجيل حضور القداس يدوياً"
                     onClick={() => openAttendanceDialog("CHURCH")}
-                    disabled={addingType !== null}
+                    disabled={savingAttendance}
                   >
-                    {addingType === "CHURCH" ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <Plus className="size-3" />
-                    )}
+                    <Plus className="size-3" />
                     إدخال الحضور
                   </Button>
                 </div>
@@ -293,13 +312,9 @@ export function ScoringEntry({
                     className="gap-1 text-xs"
                     aria-label="تسجيل حضور الخدمة يدوياً"
                     onClick={() => openAttendanceDialog("SERVICE")}
-                    disabled={addingType !== null}
+                    disabled={savingAttendance}
                   >
-                    {addingType === "SERVICE" ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <Plus className="size-3" />
-                    )}
+                    <Plus className="size-3" />
                     إدخال الحضور
                   </Button>
                 </div>
@@ -410,45 +425,115 @@ export function ScoringEntry({
         </div>
       )}
 
-      {/* Attendance value picker — the admin chooses how many points the entry earns. */}
+      {/* Attendance options — the admin marks which services the member attended */}
       <Dialog
         open={attendanceDialogOpen}
         onOpenChange={(open) => {
-          if (!open && addingType === null) setAttendanceDialogOpen(false)
+          if (!open && !savingAttendance) setAttendanceDialogOpen(false)
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {attendanceType === "CHURCH" ? "درجة حضور القداس" : "درجة حضور الخدمة"}
-            </DialogTitle>
+            <DialogTitle>تسجيل الحضور</DialogTitle>
             <DialogDescription>
-              اختر قيمة درجة الحضور ليوم {fridayArabicLabel(weekDate)}
+              حدد حضور القداس والخدمة ليوم {fridayArabicLabel(weekDate)}
             </DialogDescription>
           </DialogHeader>
-          <CommitmentPicker
-            label="درجة الحضور"
-            value={attendanceValue}
-            onChange={setAttendanceValue}
-          />
-          <p className="text-center text-[11px] text-muted-foreground">
-            القيمة الافتراضية من القواعد: +{cfg(attendanceCategory)} نقطة
-          </p>
+          <div className="space-y-3">
+            <AttendanceOptionRow
+              label="حضور القداس"
+              points={cfg("CHURCH_ATTENDANCE")}
+              alreadyRecorded={state?.dayAttendance.church.present ?? false}
+              value={attendanceDraft.CHURCH}
+              onChange={(v) => setAttendanceDraft((d) => ({ ...d, CHURCH: v }))}
+              disabled={savingAttendance}
+            />
+            <AttendanceOptionRow
+              label="حضور الخدمة"
+              points={cfg("SERVICE_ATTENDANCE")}
+              alreadyRecorded={state?.dayAttendance.service.present ?? false}
+              value={attendanceDraft.SERVICE}
+              onChange={(v) => setAttendanceDraft((d) => ({ ...d, SERVICE: v }))}
+              disabled={savingAttendance}
+            />
+            <p className="text-center text-[11px] text-muted-foreground">
+              القداس: +{cfg("CHURCH_ATTENDANCE")} نقطة · الخدمة: +{cfg("SERVICE_ATTENDANCE")} نقطة
+            </p>
+          </div>
           <DialogFooter>
             <Button
               type="button"
-              onClick={() =>
-                attendanceType && void handleAddAttendance(attendanceType, attendanceValue)
-              }
-              disabled={addingType !== null}
+              onClick={() => void handleSaveAttendance()}
+              disabled={savingAttendance}
               className="gap-2"
             >
-              {addingType !== null ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              {addingType !== null ? "جاري التسجيل…" : "تسجيل الحضور"}
+              {savingAttendance ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {savingAttendance ? "جاري التسجيل…" : "تسجيل الحضور"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function AttendanceOptionRow({
+  label,
+  points,
+  alreadyRecorded,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string
+  points: number
+  alreadyRecorded: boolean
+  value: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="space-y-2 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-foreground/5">
+      <p className="text-sm font-medium">{label}</p>
+      {alreadyRecorded ? (
+        <p className="flex items-center gap-1.5 rounded-xl bg-coptic-teal/10 px-3 py-2.5 text-xs font-bold text-coptic-teal ring-1 ring-coptic-teal/30">
+          <Check className="size-3.5" />
+          تم التسجيل (+{points} نقطة)
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/60 p-1" role="radiogroup">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={value}
+            aria-label={`${label} حاضر`}
+            onClick={() => onChange(true)}
+            disabled={disabled}
+            className={`rounded-lg py-2.5 text-sm font-medium transition-colors disabled:opacity-60 ${
+              value
+                ? "bg-coptic-teal text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            حاضر
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!value}
+            aria-label={`${label} غائب`}
+            onClick={() => onChange(false)}
+            disabled={disabled}
+            className={`rounded-lg py-2.5 text-sm font-medium transition-colors disabled:opacity-60 ${
+              !value
+                ? "bg-destructive/10 text-destructive shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            غائب
+          </button>
+        </div>
+      )}
     </div>
   )
 }
