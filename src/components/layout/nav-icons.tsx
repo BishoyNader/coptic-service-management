@@ -17,6 +17,7 @@ import {
   Activity,
   CalendarDays,
   BookOpen,
+  Footprints,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   activity: Activity,
   calendar: CalendarDays,
   "book-open": BookOpen,
+  footprints: Footprints,
   menu: Menu,
 };
 

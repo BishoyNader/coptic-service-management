@@ -22,6 +22,7 @@ export const SERVANT_NAV: NavItem[] = [
   { href: "/app/servant", label: "الرئيسية", icon: "home" },
   { href: "/app/servant/attendance", label: "تسجيل حضور", icon: "scan" },
   { href: "/app/servant/members", label: "المخدومين", icon: "users" },
+  { href: "/app/servant/visitations", label: "الافتقاد", icon: "footprints" },
   { href: "/app/servant/scores", label: "الدرجات", icon: "star" },
   { href: "/app/servant/birthdays", label: "أعياد الميلاد", icon: "cake" },
   { href: "/app/servant/reports", label: "التقارير", icon: "chart" },
@@ -34,6 +35,7 @@ export const SERVANT_NAV: NavItem[] = [
 export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin", label: "الرئيسية", icon: "home" },
   { href: "/app/super-admin/members", label: "المخدومين", icon: "users" },
+  { href: "/app/super-admin/visitations", label: "الافتقاد", icon: "footprints" },
   { href: "/app/super-admin/classes", label: "الأصناف", icon: "book-open" },
   { href: "/app/super-admin/servants", label: "الخدام", icon: "hand-helping" },
   { href: "/app/super-admin/attendance", label: "الحضور", icon: "scan" },
