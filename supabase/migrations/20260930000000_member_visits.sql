@@ -47,3 +47,4 @@ create policy "member_visits_insert_staff"
   with check (public.current_role() in ('SERVANT', 'SUPER_ADMIN'));
 
 grant select, insert on public.member_visits to authenticated;
+grant select, insert, update, delete on table public.member_visits to service_role;
