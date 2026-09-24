@@ -14,6 +14,7 @@ import { ExportButton } from "@/components/app/export-button"
 import { ImportUsersButton } from "@/components/app/import-users-button"
 import { exportMembersAction } from "@/app/actions/exports"
 import { listActiveClasses } from "@/services/classes-service"
+import { getServantClassId } from "@/services/member-scoring-service"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
@@ -26,6 +27,9 @@ export default async function ServantMembersPage({
   const profile = await getProfile(supabase)
   if (!profile || profile.role !== ROLES.SERVANT) redirect("/")
 
+  const admin = createAdminClient()
+  const myClassId = await getServantClassId(admin, profile.id)
+
   const sp = await searchParams
   const rawPage = Number.parseInt(sp.page ?? "", 10) || 1
   const page = Math.max(1, rawPage)
@@ -33,14 +37,25 @@ export default async function ServantMembersPage({
   const to = from + LIST_PAGE_SIZE - 1
   const q = (sp.q ?? "").trim()
 
-  const classes = await listActiveClasses(createAdminClient())
+  const classes = await listActiveClasses(admin)
 
-  let query = supabase
+  // Scoped to the servant's class (served_members reads are admin-granted);
+  // an unassigned servant keeps the legacy any-member scope.
+  let query = admin
     .from("profiles")
-    .select("id, full_name, phone, status, served_members(class)", { count: "exact" })
+    .select(
+      myClassId
+        ? "id, full_name, phone, status, served_members!inner(class_id, class)"
+        : "id, full_name, phone, status, served_members(class)",
+      { count: "exact" }
+    )
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
     .order("id")
+
+  if (myClassId) {
+    query = query.eq("served_members.class_id", myClassId)
+  }
 
   if (q) {
     query = query.ilike("full_name", `%${q}%`)

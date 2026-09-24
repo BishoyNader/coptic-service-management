@@ -11,6 +11,7 @@ import { lastFridayOnOrBefore } from "@/lib/friday"
 import { cairoDateString } from "@/lib/cairo"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { listActiveClasses } from "@/services/classes-service"
+import { getServantClassId, memberInClass } from "@/services/member-scoring-service"
 
 export const metadata: Metadata = { title: "عرض عضو" }
 
@@ -24,6 +25,16 @@ export default async function ServantMemberDetailPage({
   const session = await getProfile(supabase)
   if (!session || (session.role !== ROLES.SERVANT && session.role !== ROLES.SUPER_ADMIN)) {
     redirect("/")
+  }
+
+  const admin = createAdminClient()
+  if (session.role === ROLES.SERVANT) {
+    const myClassId = await getServantClassId(admin, session.id)
+    // A class-assigned servant may only open members of their own class; an
+    // unassigned servant keeps the legacy any-member scope.
+    if (myClassId && !(await memberInClass(admin, id, myClassId))) {
+      notFound()
+    }
   }
 
   const profile = await getProfileById(supabase, id)

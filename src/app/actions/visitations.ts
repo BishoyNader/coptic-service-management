@@ -2,8 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { ROLES, isStaffRole, type AppRole } from "@/lib/roles"
-import { getServantClassId, memberInClass } from "@/services/member-scoring-service"
+import { isStaffRole, type AppRole } from "@/lib/roles"
 import { recordMemberVisit, type VisitRecordResult } from "@/services/visitation-service"
 
 /**
@@ -35,8 +34,8 @@ function isUuid(value: string): boolean {
 /**
  * Marks a served member as visited (الافتقاد) for today's Cairo date.
  *
- * A servant is limited to their assigned class (unassigned servants may visit
- * anyone, mirroring the legacy any-member scope). Idempotent per member-day.
+ * A servant may record a visit for any served member (no class restriction);
+ * idempotent per member-day.
  */
 export async function markMemberVisitedAction(memberId: string): Promise<VisitRecordResult> {
   const actor = await requireStaffActor()
@@ -44,13 +43,5 @@ export async function markMemberVisitedAction(memberId: string): Promise<VisitRe
   if (!isUuid(memberId)) return { ok: false, message: "بيانات غير صحيحة" }
 
   const admin = createAdminClient()
-
-  if (actor.role === ROLES.SERVANT) {
-    const myClass = await getServantClassId(admin, actor.actorId)
-    if (myClass && !(await memberInClass(admin, memberId, myClass))) {
-      return { ok: false, message: "هذا المخدوم ليس ضمن صفّك" }
-    }
-  }
-
   return recordMemberVisit(admin, { actorId: actor.actorId, memberId })
 }

@@ -6,7 +6,6 @@ import { getProfile } from "@/services/profile-service"
 import { ROLES } from "@/lib/roles"
 import { getServerNow } from "@/services/attendance-service"
 import { cairoDateString } from "@/lib/cairo"
-import { getServantClassId } from "@/services/member-scoring-service"
 import { getVisitationBoard } from "@/services/visitation-service"
 import { VisitationBoard } from "@/components/app/visitation-board"
 
@@ -18,10 +17,9 @@ export default async function ServantVisitationsPage() {
   const admin = createAdminClient()
   const today = cairoDateString(getServerNow())
 
-  const myClassId = await getServantClassId(admin, profile.id)
-  const groups = myClassId
-    ? await getVisitationBoard(admin, { classIds: [myClassId] })
-    : await getVisitationBoard(admin, { includeUnclassified: true })
+  // A servant may visit any served member, so the board covers every class —
+  // not just their own.
+  const groups = await getVisitationBoard(admin, { includeUnclassified: true })
 
   return (
     <div className="space-y-5">
@@ -32,7 +30,7 @@ export default async function ServantVisitationsPage() {
         <div className="space-y-0.5">
           <h1 className="font-heading text-xl font-extrabold">الافتقاد</h1>
           <p className="text-sm text-muted-foreground">
-            تابع مخدومين صفّك — اضغط على اسم المخدوم لتسجيل افتقاده
+            تابع افتقاد المخدومين — اضغط على اسم المخدوم لتسجيل افتقاده
           </p>
         </div>
       </div>

@@ -2,7 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { SupabaseServerClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { ROLES } from "@/lib/roles"
+import { getServantClassId } from "@/services/member-scoring-service"
 import { validateRange, type ReportRange } from "@/services/reports-service"
 import { consumeRateLimit, exportKey, ratePolicy } from "@/lib/rate-limit"
 
@@ -14,7 +16,9 @@ type ExportActionResult =
   | { ok: true; csv: string; filename: string }
   | { ok: false; message: string }
 
-async function requireAdmin(): Promise<SupabaseServerClient | null> {
+type AdminContext = { supabase: SupabaseServerClient; userId: string; isServant: boolean }
+
+async function requireAdmin(): Promise<AdminContext | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -37,7 +41,7 @@ async function requireAdmin(): Promise<SupabaseServerClient | null> {
   )
   if (!allowed) return null
 
-  return supabase
+  return { supabase, userId: user.id, isServant: profile.role === ROLES.SERVANT }
 }
 
 function csvEscape(value: string | number | null | undefined): string {
@@ -59,15 +63,41 @@ function toCsv(headers: string[], rows: (string | number | null | undefined)[][]
 // --- Members export ----------------------------------------------------------
 
 export async function exportMembersAction(): Promise<ExportActionResult> {
-  const supabase = await requireAdmin()
-  if (!supabase) return { ok: false, message: "غير مصرح" }
+  const ctx = await requireAdmin()
+  if (!ctx) return { ok: false, message: "غير مصرح" }
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class)")
-    .eq("role", "SERVED_MEMBER")
-    .order("full_name", { ascending: true })
-    .limit(MEMBERS_EXPORT_LIMIT)
+  // A class-assigned servant exports only their class's members; an
+  // unassigned servant (like a super-admin) exports the whole roster.
+  let query
+  if (ctx.isServant) {
+    const admin = createAdminClient()
+    const myClassId = await getServantClassId(admin, ctx.userId)
+    if (myClassId) {
+      query = admin
+        .from("profiles")
+        .select("full_name, phone, role, status, date_of_birth, created_at, served_members!inner(class_id, class)")
+        .eq("role", "SERVED_MEMBER")
+        .eq("served_members.class_id", myClassId)
+        .order("full_name", { ascending: true })
+        .limit(MEMBERS_EXPORT_LIMIT)
+    } else {
+      query = admin
+        .from("profiles")
+        .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class)")
+        .eq("role", "SERVED_MEMBER")
+        .order("full_name", { ascending: true })
+        .limit(MEMBERS_EXPORT_LIMIT)
+    }
+  } else {
+    query = ctx.supabase
+      .from("profiles")
+      .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class)")
+      .eq("role", "SERVED_MEMBER")
+      .order("full_name", { ascending: true })
+      .limit(MEMBERS_EXPORT_LIMIT)
+  }
+
+  const { data } = await query
 
   const csv = toCsv(
     ["الاسم", "الموبايل", "الدور", "الحالة", "تاريخ الميلاد", "الصف", "تاريخ الإنشاء"],
@@ -90,8 +120,9 @@ export async function exportMembersAction(): Promise<ExportActionResult> {
 export async function exportAttendanceReportAction(
   range: unknown
 ): Promise<ExportActionResult> {
-  const supabase = await requireAdmin()
-  if (!supabase) return { ok: false, message: "غير مصرح" }
+  const ctx = await requireAdmin()
+  if (!ctx) return { ok: false, message: "غير مصرح" }
+  const { supabase } = ctx
 
   let rangeValue: ReportRange
   try {
@@ -138,8 +169,9 @@ export async function exportAttendanceReportAction(
 export async function exportScoresReportAction(
   range: unknown
 ): Promise<ExportActionResult> {
-  const supabase = await requireAdmin()
-  if (!supabase) return { ok: false, message: "غير مصرح" }
+  const ctx = await requireAdmin()
+  if (!ctx) return { ok: false, message: "غير مصرح" }
+  const { supabase } = ctx
 
   let rangeValue: ReportRange
   try {
@@ -180,8 +212,9 @@ export async function exportScoresReportAction(
 export async function exportActivitiesReportAction(
   range: unknown
 ): Promise<ExportActionResult> {
-  const supabase = await requireAdmin()
-  if (!supabase) return { ok: false, message: "غير مصرح" }
+  const ctx = await requireAdmin()
+  if (!ctx) return { ok: false, message: "غير مصرح" }
+  const { supabase } = ctx
 
   let rangeValue: ReportRange
   try {
@@ -221,8 +254,9 @@ export async function exportActivitiesReportAction(
 // --- Audit log export --------------------------------------------------------
 
 export async function exportAuditLogAction(): Promise<ExportActionResult> {
-  const supabase = await requireAdmin()
-  if (!supabase) return { ok: false, message: "غير مصرح" }
+  const ctx = await requireAdmin()
+  if (!ctx) return { ok: false, message: "غير مصرح" }
+  const { supabase } = ctx
 
   const { data } = await supabase
     .from("audit_logs")
@@ -247,8 +281,9 @@ export async function exportAuditLogAction(): Promise<ExportActionResult> {
 // --- Servants export ---------------------------------------------------------
 
 export async function exportServantsAction(): Promise<ExportActionResult> {
-  const supabase = await requireAdmin()
-  if (!supabase) return { ok: false, message: "غير مصرح" }
+  const ctx = await requireAdmin()
+  if (!ctx) return { ok: false, message: "غير مصرح" }
+  const { supabase } = ctx
 
   const { data } = await supabase
     .from("profiles")
