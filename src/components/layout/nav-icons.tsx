@@ -18,6 +18,8 @@ import {
   CalendarDays,
   BookOpen,
   Footprints,
+  Info,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,9 +40,11 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   clipboard: ClipboardList,
   activity: Activity,
   calendar: CalendarDays,
-  "book-open": BookOpen,
+    "book-open": BookOpen,
   footprints: Footprints,
   menu: Menu,
+  info: Info,
+  globe: Globe,
 };
 
 export function navIcon(name: string): LucideIcon {

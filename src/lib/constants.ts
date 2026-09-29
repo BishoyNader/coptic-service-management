@@ -44,11 +44,8 @@ export const SUPER_ADMIN_NAV: NavItem[] = [
   { href: "/app/super-admin/activities", label: "الأنشطة", icon: "clipboard" },
   { href: "/app/super-admin/record-activities", label: "نشاط الخدام", icon: "activity" },
   { href: "/app/super-admin/reports", label: "التقارير", icon: "chart" },
-  {
-    href: "/app/super-admin/study-years",
-    label: "أعوام الخدمة",
-    icon: "calendar",
-  },
+  { href: "/app/super-admin/study-years", label: "أعوام الخدمة", icon: "calendar" },
+  { href: "/app/super-admin/church", label: "عن الخدمة", icon: "info" },
   { href: "/app/super-admin/users", label: "المستخدمين", icon: "shield" },
   {
     href: "/app/super-admin/audit-log",

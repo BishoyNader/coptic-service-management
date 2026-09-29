@@ -1,23 +1,25 @@
-import type { Metadata, Viewport } from "next"
-import { Cairo, Amiri } from "next/font/google"
-import "./globals.css"
-import { Toaster } from "@/components/ui/sonner"
-import { APP_NAME, APP_TAGLINE } from "@/lib/constants"
+import type { Metadata, Viewport } from "next";
+import { Cairo, Amiri } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/layout/theme-provider";
+import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 
 const cairo = Cairo({
   variable: "--font-cairo",
   subsets: ["arabic", "latin"],
-})
+});
 
 const amiri = Amiri({
   variable: "--font-amiri",
   subsets: ["arabic"],
   weight: ["400", "700"],
-})
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://coptic-service-management.vercel.app"
+    process.env.NEXT_PUBLIC_SITE_URL ||
+      "https://coptic-service-management.vercel.app",
   ),
   title: {
     default: `${APP_NAME} — إدارة الخدمة`,
@@ -55,30 +57,30 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-}
+};
 
 export const viewport: Viewport = {
   themeColor: "#0E6E5C",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-}
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html
       lang="ar"
       dir="rtl"
-      className={`${cairo.variable} ${amiri.variable} h-full antialiased`}
+      className={`${cairo.variable} ${amiri.variable} h-full min-h-full scroll-smooth antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
         <Toaster richColors position="top-center" />
       </body>
     </html>
-  )
+  );
 }

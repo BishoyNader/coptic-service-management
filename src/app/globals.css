@@ -174,6 +174,65 @@
   .pt-safe {
     padding-top: max(env(safe-area-inset-top), 0px);
   }
+
+  /* ─── Entrance animations (inspired by samaanshaaban.vercel.app) ─────────── */
+  .fade-in-up {
+    animation: fadeInUp 0.35s ease-out forwards;
+  }
+  .fade-in {
+    animation: fadeIn 0.25s ease-out forwards;
+  }
+  .scale-in {
+    animation: scaleIn 0.25s ease-out forwards;
+  }
+
+  /* Staggered children animation container */
+  .animate-children-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .animate-children-stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .animate-children-stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .animate-children-stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .animate-children-stagger > *:nth-child(5) { animation-delay: 200ms; }
+  .animate-children-stagger > *:nth-child(6) { animation-delay: 250ms; }
+
+  /* Enhanced card hover — subtle lift + shadow (portfolio pattern) */
+  .card-hover {
+    @apply transition-all duration-200 ease-out;
+  }
+  .card-hover:hover {
+    @apply shadow-md ring-1 ring-foreground/5;
+  }
+
+  /* Section heading style used across the app */
+  .section-heading {
+    @apply font-heading text-lg font-bold text-foreground;
+  }
+  .section-heading-sub {
+    @apply text-sm text-muted-foreground;
+  }
+
+  /* Anchor smooth scroll offset for RTL */
+  :target {
+    scroll-margin-top: 4rem;
+    scroll-margin-start: 1rem;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ─── Keyframes ────────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes scaleIn {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* Subtle Coptic geometric lattice used as backdrop */

@@ -10,7 +10,7 @@ type WelcomeCardProps = {
 /** Shown right after a successful registration. */
 export function WelcomeCard({ name, roleLabel, qrToken, personalCode }: WelcomeCardProps) {
   return (
-    <div className="space-y-4">
+        <div className="fade-in-up space-y-4">
       <div className="relative overflow-hidden rounded-3xl bg-coptic-teal p-6 text-center text-primary-foreground">
         <div className="pointer-events-none absolute inset-0 coptic-lattice-gold opacity-60" />
         <div className="relative">
