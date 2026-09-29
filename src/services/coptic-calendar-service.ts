@@ -33,11 +33,13 @@ export const COPTIC_CALENDAR_TZ = CAIRO_TZ
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type CopticCelebrationType = "feast" | "lordlyFeast" | "fast"
+export type CopticCelebrationType = "feast" | "lordlyFeast" | "fast" | "commemoration"
 
 export type CopticCelebration = {
-  /** English name as returned by the API. */
+  /** Arabic display name. */
   name: string
+  /** English name as returned by the API (kept for debugging). */
+  englishName: string
   type: CopticCelebrationType
   isMoveable: boolean
 }
@@ -75,25 +77,83 @@ export type UpcomingFeastsResult =
 
 const FETCH_TIMEOUT_MS = 5_000
 
+/** Arabic names for the 12 Coptic calendar months + the epagomenal days. */
+export const COPTIC_MONTH_AR: Record<string, string> = {
+  Tout: "توت",
+  Paopi: "بؤبة",
+  Hathor: "هاتور",
+  Koiak: "كوياك",
+  Tobi: "طوبي",
+  Meshir: "مشير",
+  Paremhat: "برمهات",
+  Parmouti: "برموطى",
+  Pashons: "بشنس",
+  Paoni: "ناسي",
+  Epip: "إيب",
+  Mesori: "ميسوري",
+}
+
+/**
+ * Common feast and commemoration name translations. Falls back to the
+ * English name when no translation is available.
+ */
+const CELEBRATION_NAME_AR: Record<string, string> = {
+  "Annunciation, Nativity, and Resurrection": "إعلان، ميلاد، وقيامة",
+  "Circumcision Feast": "عيد الختان",
+  "Nativity of the Lord": "ميلاد السيد",
+  "Theophany": "المأبودية",
+  "Entry into the Temple": "دخول السيد في الكنيسة",
+  "Flight to Egypt": "هروب إلى مصر",
+  "Cana": "قانا",
+  "Transfiguration": "التجلي",
+  "Palm Sunday": "الأحد المقدس",
+  "Resurrection": "القيامة",
+  "Ascension": "الصعود",
+  "Pentecost": "الروح القدس",
+  "Covenant Thursday": "الخميس العظيم",
+  "Thomas Sunday": "الأحد الثالث",
+  "Feast of the Cross": "عيد الصليب",
+  "Annunciation": "إعلان عن المسيح",
+  "Assumption of the Virgin": "انتقال السيدة العذراء",
+  "Nativity": "الميلاد",
+  "St. Mark's Day": "عيد الشهيد مار مارقوريوس",
+  "Synaxis of the Archangel Michael": "اجتماع الملاك المهند",
+  "Commemoration of the Martyrs": "ذكرى شهداء العصر",
+}
+
+function translateCopticMonth(monthString: string): string {
+  return COPTIC_MONTH_AR[monthString] ?? monthString
+}
+
+function translateCelebrationName(name: string): string {
+  return CELEBRATION_NAME_AR[name] ?? name
+}
+
 function parseCelebration(raw: unknown): CopticCelebration | null {
   const c = raw as Record<string, unknown>
   if (!c || typeof c.name !== "string" || c.name.length === 0) return null
   const type =
-    c.type === "lordlyFeast" || c.type === "fast"
+    c.type === "lordlyFeast" || c.type === "fast" || c.type === "commemoration"
       ? (c.type as CopticCelebrationType)
       : "feast"
-  return { name: c.name, type, isMoveable: Boolean(c.isMoveable) }
+  return {
+    name: translateCelebrationName(c.name),
+    englishName: c.name,
+    type,
+    isMoveable: Boolean(c.isMoveable),
+  }
 }
 
 function parseCopticDay(raw: unknown): CopticDay | null {
   const d = raw as Record<string, unknown>
   if (!d) return null
+  const monthString = String(d.monthString ?? "")
   return {
     dateString: String(d.dateString ?? ""),
     day: Number(d.day ?? 0),
     month: Number(d.month ?? 0),
     year: Number(d.year ?? 0),
-    monthString: String(d.monthString ?? ""),
+    monthString: translateCopticMonth(monthString),
   }
 }
 
@@ -119,15 +179,17 @@ export async function getCopticCalendarDay(
   dateString: string
 ): Promise<CopticCalendarResult> {
   try {
-    const [calRes, celRes] = await Promise.all([
+        const [calRes, celRes] = await Promise.all([
       fetch(`${COPTIC_API_BASE}/api/calendar/${dateString}`, {
         headers: { accept: "application/json" },
         // Cache for 1 hour; feast data doesn't change within a day.
         next: { revalidate: 3600 },
+        signal: withTimeout(FETCH_TIMEOUT_MS),
       }),
       fetch(`${COPTIC_API_BASE}/api/celebrations/${dateString}`, {
         headers: { accept: "application/json" },
         next: { revalidate: 3600 },
+        signal: withTimeout(FETCH_TIMEOUT_MS),
       }),
     ])
 

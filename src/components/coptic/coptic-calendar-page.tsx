@@ -20,6 +20,7 @@ const TYPE_META = {
   feast: { label: "عيد", Icon: Cake },
   lordlyFeast: { label: "عيد سيدي", Icon: MoonStar },
   fast: { label: "صوم", Icon: Snowflake },
+  commemoration: { label: "ذكرى", Icon: CalendarDays },
 } as const
 
 type NotifyAction = () => Promise<{

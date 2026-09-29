@@ -20,6 +20,7 @@ import {
   restoreActivityAction,
   updateActivityAction,
 } from "@/app/actions/activities"
+import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/coptic/empty-state"
 import {
@@ -84,7 +85,8 @@ export function ActivitiesSettings({
   const [busy, setBusy] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<Activity | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
-  const [restoringId, setRestoringId] = useState<string | null>(null)
+    const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const openAdd = () => {
     setEditingId(null)
@@ -159,9 +161,24 @@ export function ActivitiesSettings({
         <p className="font-heading text-sm font-bold text-muted-foreground">
           الأنشطة والدرجات — يقرؤها لوح تقييم الخدام وشاشة درجات المخدوم
         </p>
+        {activities.some((a) => !a.is_active) && (
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              showArchived
+                ? "bg-coptic-teal/10 text-coptic-teal"
+                : "text-muted-foreground hover:bg-secondary"
+            )}
+            data-testid="toggle-archived"
+          >
+            <span>{showArchived ? "إخفاء" : "إظهار"} المحذوف</span>
+          </button>
+        )}
         <Button
           onClick={openAdd}
-          className="ms-auto gap-1.5"
+          className="gap-1.5"
           size="sm"
           data-testid="add-activity"
         >
@@ -178,7 +195,7 @@ export function ActivitiesSettings({
         />
       ) : (
         <div className="space-y-2">
-          {activities.map((a) => {
+          {activities.filter((a) => showArchived || a.is_active).map((a) => {
             const archived = !a.is_active
             return (
               <div

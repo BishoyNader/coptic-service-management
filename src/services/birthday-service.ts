@@ -103,9 +103,9 @@ export async function getUpcomingBirthdays(
 
 /**
  * Sends a single-recipient birthday greeting notification to one ACTIVE
- * served member and records a birthday_reminders row so the same birthday
- * occurrence can never be greeted twice. Both writes always happen together:
- * if the reminder insert fails, the notification is rolled back.
+ * served member or servant and records a birthday_reminders row so the same
+ * birthday occurrence can never be greeted twice. Both writes always happen
+ * together: if the reminder insert fails, the notification is rolled back.
  */
 export async function sendBirthdayGreeting(
   admin: SupabaseAdminClient,
@@ -123,8 +123,11 @@ export async function sendBirthdayGreeting(
   if (targetError || !target) {
     return { ok: false, message: "المخدوم غير موجود", alreadySent: false }
   }
-  if (target.role !== ROLES.SERVED_MEMBER) {
-    return { ok: false, message: "التهنئة متاحة للمخدومين فقط", alreadySent: false }
+  if (
+    target.role !== ROLES.SERVED_MEMBER &&
+    target.role !== ROLES.SERVANT
+  ) {
+    return { ok: false, message: "التهنئة متاحة للمخدومين والخدام فقط", alreadySent: false }
   }
   if (target.status !== "ACTIVE") {
     return { ok: false, message: "الحساب غير نشط", alreadySent: false }
@@ -170,7 +173,7 @@ export async function sendBirthdayGreeting(
     .insert({
       title,
       body,
-      audience: [ROLES.SERVED_MEMBER],
+            audience: [target.role as AppRole],
       sender_id: input.actorId,
     })
     .select("id")

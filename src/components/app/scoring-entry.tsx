@@ -6,6 +6,7 @@ import { CalendarPlus, Save, Star, Loader2, Plus, Check } from "lucide-react"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -57,10 +58,11 @@ export function ScoringEntry({
   const [saving, setSaving] = useState(false)
   const [savingAttendance, setSavingAttendance] = useState(false)
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false)
-  const [attendanceDraft, setAttendanceDraft] = useState<{
+    const [attendanceDraft, setAttendanceDraft] = useState<{
     CHURCH: boolean
     SERVICE: boolean
   }>({ CHURCH: false, SERVICE: false })
+  const [grantAttendancePoints, setGrantAttendancePoints] = useState(false)
 
   const [commitment, setCommitment] = useState(0)
   const [serviceCommitment, setServiceCommitment] = useState(0)
@@ -155,11 +157,12 @@ export function ScoringEntry({
     }
   }
 
-  const openAttendanceDialog = (type: "CHURCH" | "SERVICE") => {
+    const openAttendanceDialog = (type: "CHURCH" | "SERVICE") => {
     setAttendanceDraft({
       CHURCH: type === "CHURCH" || (state?.dayAttendance.church.present ?? false),
       SERVICE: type === "SERVICE" || (state?.dayAttendance.service.present ?? false),
     })
+    setGrantAttendancePoints(false)
     setAttendanceDialogOpen(true)
   }
 
@@ -184,10 +187,15 @@ export function ScoringEntry({
       setAttendanceDialogOpen(false)
       return
     }
-    setSavingAttendance(true)
+        setSavingAttendance(true)
     const results = await Promise.all(
       targets.map((type) =>
-        recordChildAttendanceAction(memberId, type, weekDate, defaultAttendancePoints(type))
+        recordChildAttendanceAction(
+          memberId,
+          type,
+          weekDate,
+          grantAttendancePoints ? defaultAttendancePoints(type) : 0
+        )
       )
     )
     setSavingAttendance(false)
@@ -448,7 +456,7 @@ export function ScoringEntry({
               onChange={(v) => setAttendanceDraft((d) => ({ ...d, CHURCH: v }))}
               disabled={savingAttendance}
             />
-            <AttendanceOptionRow
+                        <AttendanceOptionRow
               label="حضور الخدمة"
               points={cfg("SERVICE_ATTENDANCE")}
               alreadyRecorded={state?.dayAttendance.service.present ?? false}
@@ -456,8 +464,18 @@ export function ScoringEntry({
               onChange={(v) => setAttendanceDraft((d) => ({ ...d, SERVICE: v }))}
               disabled={savingAttendance}
             />
+            <div className="flex items-center justify-between rounded-xl bg-secondary/30 px-3 py-2">
+              <Label className="text-sm">منح نقاط الحضور</Label>
+              <Checkbox
+                checked={grantAttendancePoints}
+                onCheckedChange={(checked) => setGrantAttendancePoints(checked === true)}
+                aria-label="منح نقاط الحضور"
+                data-testid="grant-attendance-points"
+              />
+            </div>
             <p className="text-center text-[11px] text-muted-foreground">
               القداس: +{cfg("CHURCH_ATTENDANCE")} نقطة · الخدمة: +{cfg("SERVICE_ATTENDANCE")} نقطة
+              {grantAttendancePoints ? null : " (بدون نقاط)"}
             </p>
           </div>
           <DialogFooter>
