@@ -233,7 +233,7 @@ export function ChessGame(props: Props) {
   return (
     <div className="space-y-3" dir="ltr">
       {/* Opponent bar */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <PlayerChip
           icon={props.mode === "ai" ? <Cpu className="size-4" /> : <User className="size-4" />}
           name={opponentName}
@@ -295,13 +295,13 @@ export function ChessGame(props: Props) {
         {/* Promotion picker */}
         {promotion ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/45 backdrop-blur-[2px]">
-            <div className="flex gap-2 rounded-2xl bg-card p-3 shadow-xl ring-1 ring-foreground/10">
+            <div className="flex gap-1.5 rounded-2xl bg-card p-2.5 shadow-xl ring-1 ring-foreground/10 sm:gap-2 sm:p-3">
               {promotion.map((m) => (
                 <button
                   key={m.promo}
                   type="button"
                   onClick={() => commit(m)}
-                  className="flex size-14 items-center justify-center rounded-xl bg-secondary text-3xl transition-transform hover:scale-110"
+                  className="flex size-12 items-center justify-center rounded-xl bg-secondary text-3xl transition-transform hover:scale-110 sm:size-14"
                 >
                   <span
                     className={
@@ -352,9 +352,9 @@ export function ChessGame(props: Props) {
       </div>
 
       {/* Player bar + actions */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <PlayerChip icon={<User className="size-4" />} name="أنت" active={!finished && state.turn === myColor} />
-        <div className="flex items-center gap-1.5">
+        <div className="ms-auto flex items-center gap-1.5">
           <div className="flex items-center gap-1 text-xs font-bold tabular-nums">
             <span className="rounded-xl bg-coptic-teal/15 px-2 py-1 text-coptic-teal">{tally.wins}</span>
             <span className="rounded-xl bg-secondary px-2 py-1 text-muted-foreground">{tally.draws}</span>

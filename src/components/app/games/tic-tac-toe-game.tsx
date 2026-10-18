@@ -161,7 +161,7 @@ export function TttGame(props: Props) {
   return (
     <div className="space-y-4">
       {/* Opponent */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <PlayerChip
           icon={props.mode === "ai" ? <Cpu className="size-4" /> : <User className="size-4" />}
           name={opponentName}
@@ -222,9 +222,9 @@ export function TttGame(props: Props) {
       </div>
 
       {/* Player + actions */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <PlayerChip icon={<User className="size-4" />} name="أنت" mark={myMark} active={!finished && turnOf(board) === myMark} />
-        <div className="flex gap-1.5">
+        <div className="ms-auto flex gap-1.5">
           {!finished ? (
             <Button size="sm" variant="outline" onClick={resign}>
               <Flag className="size-4" />
