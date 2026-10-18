@@ -25,7 +25,9 @@ import {
   Hourglass,
   Loader2,
   ChevronLeft,
+  RefreshCw,
 } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -389,7 +391,8 @@ function OnlineLobby({
 
   const send = async (userId: string, name: string) => {
     setChallengeFor(null)
-    await mp.challenge({ id: userId, name }, game)
+    const ok = await mp.challenge({ id: userId, name }, game)
+    if (!ok) toast.error("مقدرتش أبعت التحدي — اتأكد من الاتصال وجرّب تاني")
   }
 
   return (
@@ -408,6 +411,16 @@ function OnlineLobby({
         <span className="ms-auto rounded-full bg-background/60 px-2 py-0.5 text-xs font-bold tabular-nums">
           {mp.onlineUsers.length}
         </span>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          title="تحديث القائمة"
+          aria-label="تحديث القائمة"
+          onClick={() => mp.refreshLobby()}
+        >
+          <RefreshCw className="size-4" />
+        </Button>
       </div>
 
       {/* Pending challenge banner */}
