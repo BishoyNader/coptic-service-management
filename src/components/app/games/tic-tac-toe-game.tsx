@@ -52,6 +52,9 @@ export function TttGame(props: Props) {
   const [forfeit, setForfeit] = useState<Outcome | null>(null) // resignation / disconnect
   const [tally, setTally] = useState({ wins: 0, draws: 0, losses: 0 })
 
+  // Non-null only in online mode; stable identity, unlike the `props` object.
+  const sendEvent = props.mode === "online" ? props.sendEvent : null
+
   // Mirror of `forfeit` readable from long-lived handlers (event sinks).
   const forfeitRef = useRef<Outcome | null>(null)
   useEffect(() => {
@@ -97,11 +100,11 @@ export function TttGame(props: Props) {
       next[idx] = mark
       setBoard(next)
       settle(next)
-      if (props.mode === "online" && !mirror) {
-        void props.sendEvent({ type: "move", data: { idx, mark } })
+      if (sendEvent && !mirror) {
+        void sendEvent({ type: "move", data: { idx, mark } })
       }
     },
-    [board, finished, props, settle]
+    [board, finished, sendEvent, settle]
   )
 
   /* ---------------- AI opponent ---------------- */
@@ -143,8 +146,8 @@ export function TttGame(props: Props) {
   const restart = useCallback(() => {
     setBoard(emptyBoard())
     setForfeit(null)
-    if (props.mode === "online") void props.sendEvent({ type: "restart" })
-  }, [props])
+    if (sendEvent) void sendEvent({ type: "restart" })
+  }, [sendEvent])
 
   const resign = useCallback(() => {
     if (forfeitRef.current !== null || finished) return
@@ -152,8 +155,8 @@ export function TttGame(props: Props) {
     forfeitRef.current = result
     setForfeit(result)
     countResult(result)
-    if (props.mode === "online") void props.sendEvent({ type: "resign" })
-  }, [myMark, props, countResult, finished])
+    if (sendEvent) void sendEvent({ type: "resign" })
+  }, [myMark, sendEvent, countResult, finished])
 
   return (
     <div className="space-y-4">

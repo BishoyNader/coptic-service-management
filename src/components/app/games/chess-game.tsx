@@ -68,6 +68,10 @@ export function ChessGame(props: Props) {
   const [history, setHistory] = useState<string[]>([])
   const [tally, setTally] = useState({ wins: 0, draws: 0, losses: 0 })
 
+  // Non-null only in online mode; also marks "this is an online game" for
+  // the callbacks below (stable identity, unlike the `props` object itself).
+  const sendEvent = props.mode === "online" ? props.sendEvent : null
+
   // Mirror of `over` readable from long-lived handlers (event sinks).
   const overRef = useRef<GameOver | null>(null)
   useEffect(() => {
@@ -89,11 +93,15 @@ export function ChessGame(props: Props) {
     }))
   }, [])
 
-  /** Apply a move made by this client (click or AI). */
+  /** Apply a move made by this client (click) or by the local AI. */
   const commit = useCallback(
     (m: ChessMove) => {
       const st = getStatus(state)
-      if (st.over || state.turn !== myColor) return
+      if (st.over) return
+      // In online mode only our own turn may be committed here — remote
+      // moves go through applyRemote. In AI mode both the human and the
+      // computer commit through this path, so the turn is not checked.
+      if (sendEvent && state.turn !== myColor) return
       const note = moveNotation(state, m)
       const next = applyMove(state, m)
       const nextStatus = getStatus(next)
@@ -107,9 +115,9 @@ export function ChessGame(props: Props) {
       setState(next)
       setSelected(null)
       setPromotion(null)
-      if (props.mode === "online") void props.sendEvent({ type: "move", data: m })
+      if (sendEvent) void sendEvent({ type: "move", data: m })
     },
-    [state, props, myColor, countResult]
+    [state, sendEvent, myColor, countResult]
   )
 
   /** Apply a move received from the opponent. */
@@ -177,16 +185,16 @@ export function ChessGame(props: Props) {
     setLastMove(null)
     setSelected(null)
     setOver(null)
-    if (props.mode === "online") void props.sendEvent({ type: "restart" })
-  }, [props])
+    if (sendEvent) void sendEvent({ type: "restart" })
+  }, [sendEvent])
 
   const resign = useCallback(() => {
     if (over) return
     const result = myColor === "w" ? "loss" : "win"
     setOver({ status: null, outcome: result })
     countResult(result)
-    if (props.mode === "online") void props.sendEvent({ type: "resign" })
-  }, [over, myColor, props, countResult])
+    if (sendEvent) void sendEvent({ type: "resign" })
+  }, [over, myColor, sendEvent, countResult])
 
   const onSquareClick = (sq: number) => {
     if (finished || !myTurn) return
