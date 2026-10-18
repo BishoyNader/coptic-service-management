@@ -24,6 +24,9 @@ type Props = {
 
 type ParsedRow = Record<string, unknown>
 
+/** Columns that must be filled for served-member imports; the rest are optional. */
+const REQUIRED_MEMBER_HEADERS = new Set(["الاسم", "الموبايل", "كلمة المرور"])
+
 function getTemplateHeaders(role: AppRole): string[] {
   if (role === "SERVED_MEMBER") {
     return ["الاسم", "الموبايل", "تاريخ الميلاد", "هاتف الأب", "هاتف الأم", "العنوان", "الصف", "كلمة المرور"]
@@ -35,7 +38,7 @@ function getTemplateSampleRows(role: AppRole): (string | number)[][] {
   if (role === "SERVED_MEMBER") {
     return [
       ["يوسف ناصر", "01012345678", "2000-05-15", "01098765432", "01087654321", "القاهرة", "الصف الأول", "12345678"],
-      ["مرى بخيت", "01123456789", "", "", "", "", "الصف الثاني", ""],
+      ["مرى بخيت", "01123456789", "", "", "", "", "الصف الثاني", "87654321"],
     ]
   }
   return [
@@ -161,7 +164,9 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
             استيراد {label}
           </DialogTitle>
           <DialogDescription>
-            قم بتحميل القالب، أضف البيانات، ثم ارفع الملف
+            {role === "SERVED_MEMBER"
+              ? "الاسم والموبايل وكلمة المرور مطلوبين (*) — باقي البيانات اختيارية"
+              : "قم بتحميل القالب، أضف البيانات، ثم ارفع الملف"}
           </DialogDescription>
         </DialogHeader>
 
@@ -214,6 +219,9 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
                     {headers.map((h) => (
                       <th key={h} className="px-3 py-2 text-start text-muted-foreground whitespace-nowrap">
                         {h}
+                        {role === "SERVED_MEMBER" && REQUIRED_MEMBER_HEADERS.has(h) && (
+                          <span className="text-destructive"> *</span>
+                        )}
                       </th>
                     ))}
                   </tr>

@@ -9,8 +9,10 @@ import { CopticBadge } from "@/components/coptic/brand";
 import { NotificationBadge } from "@/components/app/notification-badge";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { BackToTop } from "@/components/layout/back-to-top";
+import { AvatarGate } from "@/components/app/avatar-gate";
 import { createClient } from "@/lib/supabase/client";
 import type { NavItem } from "@/lib/constants";
+import type { Profile } from "@/lib/types";
 import { MOBILE_TAB_LIMIT } from "@/lib/constants";
 import { NAV_ICONS } from "./nav-icons";
 import {
@@ -30,6 +32,8 @@ type AppShellProps = {
   name: string;
   nav: NavItem[];
   showUnreadBadge?: boolean;
+  /** Served members without a photo must add one before using the app. */
+  requirePhoto?: Pick<Profile, "id" | "full_name" | "avatar_url"> | null;
   children: React.ReactNode;
 };
 
@@ -38,6 +42,7 @@ export function AppShell({
   name,
   nav,
   showUnreadBadge = false,
+  requirePhoto,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -219,6 +224,9 @@ export function AppShell({
           ) : null}
         </nav>
       </div>
+
+      {/* Mandatory photo gate for served members without an avatar */}
+      {requirePhoto ? <AvatarGate profile={requirePhoto} /> : null}
     </div>
   );
 }

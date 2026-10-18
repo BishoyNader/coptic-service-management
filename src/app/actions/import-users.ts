@@ -85,6 +85,11 @@ function validateRow(
   }
 
   const passwordRaw = pick(row, "كلمة المرور", "password")
+  // Mandatory for served members (imported members sign in with it);
+  // servant imports keep the legacy default when the cell is empty.
+  if (role === ROLES.SERVED_MEMBER && !passwordRaw) {
+    return { ok: false, message: `الصف ${rowNumber}: كلمة المرور مطلوبة` }
+  }
   const password = passwordRaw || DEFAULT_PASSWORD
   if (password.length < 8) {
     return { ok: false, message: `الصف ${rowNumber}: كلمة المرور يجب أن تكون 8 أحرف على الأقل` }

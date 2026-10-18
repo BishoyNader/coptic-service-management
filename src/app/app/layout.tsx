@@ -34,6 +34,15 @@ export default async function AppLayout({
       showUnreadBadge={
         profile.role === ROLES.SERVED_MEMBER || profile.role === ROLES.SERVANT
       }
+      requirePhoto={
+        profile.role === ROLES.SERVED_MEMBER
+          ? {
+              id: profile.id,
+              full_name: profile.full_name,
+              avatar_url: profile.avatar_url,
+            }
+          : null
+      }
     >
       {children}
     </AppShell>
