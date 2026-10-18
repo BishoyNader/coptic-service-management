@@ -26,8 +26,8 @@ Full route map (from `npm run build`):
 ```
 /auth/callback, /login, /register(/member|/servant), /forgot-password, /reset-password
 /app/{member,servant,super-admin}/{,account,notifications}
-/app/servant/{qr,activities,attendance,scores,birthdays,members,members/[id],reports}
-/app/member/{qr,scores}
+/app/servant/{qr,activities,attendance,scores,birthdays,members,members/[id],reports,games}
+/app/member/{qr,scores,games}
 /app/super-admin/{users,user/[id],members,servants,attendance,scores,birthdays,audit-log,reports,settings,notifications}
 /api/auth/{register,set-session}
 /api/cron/birthdays

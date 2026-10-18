@@ -20,6 +20,7 @@ import {
   Footprints,
   Info,
   Globe,
+  Gamepad2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   menu: Menu,
   info: Info,
   globe: Globe,
+  gamepad: Gamepad2,
 };
 
 export function navIcon(name: string): LucideIcon {
