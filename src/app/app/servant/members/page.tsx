@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import Link from "next/link"
-import { Users, Phone, ChevronLeft, Search } from "lucide-react"
+import { Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getProfile } from "@/services/profile-service"
@@ -12,9 +11,13 @@ import { AddMemberButton } from "@/components/app/add-member-button"
 import { PaginationControls } from "@/components/app/pagination-controls"
 import { ExportButton } from "@/components/app/export-button"
 import { ImportUsersButton } from "@/components/app/import-users-button"
+import { MemberCard } from "@/components/app/member-card"
+import { MemberSearch } from "@/components/app/member-search"
 import { exportMembersAction } from "@/app/actions/exports"
 import { listActiveClasses } from "@/services/classes-service"
 import { getServantClassId } from "@/services/member-scoring-service"
+import { getMemberListStats } from "@/services/member-list-service"
+import { getActiveStudyYear } from "@/services/study-year-service"
 
 export const metadata: Metadata = { title: "المخدومين" }
 
@@ -37,17 +40,21 @@ export default async function ServantMembersPage({
   const to = from + LIST_PAGE_SIZE - 1
   const q = (sp.q ?? "").trim()
 
-  const classes = await listActiveClasses(admin)
+  const [classes, studyYear] = await Promise.all([
+    listActiveClasses(admin),
+    getActiveStudyYear(admin),
+  ])
 
   // Scoped to the servant's class (served_members reads are admin-granted);
-  // an unassigned servant keeps the legacy any-member scope.
+  // an unassigned servant keeps the legacy any-member scope. No class filter
+  // is offered here — the servant's class already *is* the filter.
   let query = admin
     .from("profiles")
     .select(
       myClassId
-        ? "id, full_name, phone, status, served_members!inner(class_id, class)"
-        : "id, full_name, phone, status, served_members(class_id, class)",
-      { count: "exact" }
+        ? "id, full_name, phone, status, avatar_url, served_members!inner(class_id, class)"
+        : "id, full_name, phone, status, avatar_url, served_members(class_id, class)",
+      { count: "exact" },
     )
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
@@ -62,6 +69,13 @@ export default async function ServantMembersPage({
   }
 
   const { data: members, count } = await query.range(from, to)
+
+  const memberRows = members ?? []
+  const statsByMember = await getMemberListStats(
+    admin,
+    memberRows.map((m) => m.id),
+    studyYear?.schedule ?? [],
+  )
 
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE))
@@ -90,20 +104,13 @@ export default async function ServantMembersPage({
         </div>
       </div>
 
-      <form method="get" className="relative">
-        <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="text"
-          name="q"
-          defaultValue={q}
-          aria-label="البحث بالاسم"
-          placeholder="ابحث بالاسم..."
-          className="h-11 w-full rounded-xl border border-input bg-transparent ps-10 pe-4 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-        />
-        <input type="hidden" name="page" value="" />
-      </form>
+      <MemberSearch
+        pathname="/app/servant/members"
+        defaultValue={q}
+        placeholder="ابحث بالاسم..."
+      />
 
-      {!members || members.length === 0 ? (
+      {memberRows.length === 0 ? (
         <EmptyState
           icon={<Users className="size-7" />}
           title={q ? "لا توجد نتائج" : "لا يوجد مخدومين حتى الآن"}
@@ -113,31 +120,22 @@ export default async function ServantMembersPage({
       ) : (
         <>
           <div className="space-y-2">
-            {members.map((m) => (
-              <Link
+            {memberRows.map((m) => (
+              <MemberCard
                 key={m.id}
                 href={`/app/servant/members/${m.id}`}
-                className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-secondary/50"
-              >
-                <div className="flex size-11 items-center justify-center rounded-full bg-coptic-gold-soft font-heading font-bold text-coptic-gold">
-                  {m.full_name.trim().charAt(0)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{m.full_name}</p>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="flex items-center gap-1" dir="ltr">
-                      <Phone className="size-3" />
-                      {m.phone}
-                    </span>
-                    {classLabelOf(m.served_members as { class?: string; class_id?: string } | null) && (
-                      <span className="rounded-full bg-coptic-gold-soft px-2 py-0.5 text-[10px] font-medium text-coptic-gold">
-                        {classLabelOf(m.served_members as { class?: string; class_id?: string } | null)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronLeft className="size-5 text-muted-foreground" />
-              </Link>
+                member={{
+                  id: m.id,
+                  fullName: m.full_name,
+                  phone: m.phone,
+                  avatarUrl: m.avatar_url,
+                  className: classLabelOf(
+                    m.served_members as { class?: string; class_id?: string } | null,
+                  ),
+                  status: m.status as "ACTIVE" | "INACTIVE" | "ARCHIVED",
+                }}
+                stats={statsByMember.get(m.id)}
+              />
             ))}
           </div>
 
