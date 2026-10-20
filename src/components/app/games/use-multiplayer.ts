@@ -178,6 +178,8 @@ export function useMultiplayer(me: { id: string; name: string }) {
   const challengeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const roomStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const acceptRetryRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  /** Keeps re-asserting room presence so a stalled socket still reads as online. */
+  const roomHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const clearChallengeTimer = useCallback(() => {
     if (challengeTimerRef.current) {
@@ -197,6 +199,10 @@ export function useMultiplayer(me: { id: string; name: string }) {
     if (roomStartTimerRef.current) {
       clearTimeout(roomStartTimerRef.current)
       roomStartTimerRef.current = null
+    }
+    if (roomHeartbeatRef.current) {
+      clearInterval(roomHeartbeatRef.current)
+      roomHeartbeatRef.current = null
     }
     clearAcceptRetry()
   }, [clearAcceptRetry])
@@ -278,10 +284,14 @@ export function useMultiplayer(me: { id: string; name: string }) {
       setOpponentLeft(false)
 
       await join(roomCh, trackPresence)
+      roomHeartbeatRef.current = setInterval(trackPresence, LOBBY_HEARTBEAT_MS)
 
       // The player may have backed out while the handshake was in flight —
       // never arm room timers for a room we already left.
-      if (activeRoomIdRef.current !== roomId) return
+      if (activeRoomIdRef.current !== roomId) {
+        clearRoomTimers()
+        return
+      }
 
       // Nobody should wait forever on a room the other player never reached.
       roomStartTimerRef.current = setTimeout(() => {

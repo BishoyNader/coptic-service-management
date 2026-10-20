@@ -124,18 +124,26 @@ export function ChessGame(props: Props) {
   const applyRemote = useCallback(
     (m: ChessMove) => {
       const st = getStatus(state)
-      if (st.over || state.turn === myColor) return
-      const note = moveNotation(state, m)
-      const next = applyMove(state, m)
-      const nextStatus = getStatus(next)
-      if (nextStatus.over) {
-        const result = outcomeFrom(nextStatus, myColor)
-        setOver({ status: nextStatus, outcome: result })
-        countResult(result)
+      if (st.over) return
+      // Ignore echoed moves from self
+      const movingPiece = state.board[m.from]
+      if (movingPiece && pieceColorOf(movingPiece) === myColor) return
+      if (!movingPiece && state.turn === myColor) return
+      try {
+        const note = moveNotation(state, m)
+        const next = applyMove(state, m)
+        const nextStatus = getStatus(next)
+        if (nextStatus.over) {
+          const result = outcomeFrom(nextStatus, myColor)
+          setOver({ status: nextStatus, outcome: result })
+          countResult(result)
+        }
+        setHistory((h) => [...h, note])
+        setLastMove(m)
+        setState(next)
+      } catch {
+        // If we can't apply it for some reason, ignore
       }
-      setHistory((h) => [...h, note])
-      setLastMove(m)
-      setState(next)
     },
     [state, myColor, countResult]
   )
