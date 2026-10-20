@@ -12,6 +12,12 @@ const VALID_PHONE = /^\+?[0-9]{10,15}$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MAX_ROWS = 500
 const DEFAULT_PASSWORD = "12345678"
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+
+type ClassLookup = {
+  /** Resolve a sheet value (a class UUID) to a class id. */
+  resolve: (raw: string) => string | undefined
+}
 
 export type ImportRow = {
   fullName: string
@@ -20,6 +26,8 @@ export type ImportRow = {
   fatherPhone?: string
   motherPhone?: string
   address?: string
+  /** Standardized class identifier (`classes.id`), never a display name. */
+  classId?: string
 }
 
 export type ImportResult = {
@@ -66,6 +74,7 @@ function validateRow(
   row: Record<string, unknown>,
   role: AppRole,
   rowNumber: number,
+  classes: ClassLookup,
 ): { ok: true; input: AdminCreateUserInput } | { ok: false; message: string } {
   const fullName = pick(row, "الاسم", "name")
   if (fullName.length < 2) return { ok: false, message: `الصف ${rowNumber}: الاسم قصير جدًا` }
@@ -103,8 +112,14 @@ function validateRow(
     dateOfBirth,
   }
 
-  const memberClass = pick(row, "الصف", "class")
-  if (memberClass) input.class = memberClass
+  const memberClass = pick(row, "معرف الصف", "class_id", "classId", "class")
+  if (memberClass) {
+    const classId = classes.resolve(memberClass)
+    if (!classId) {
+      return { ok: false, message: `الصف ${rowNumber}: معرف الصف غير صحيح (${memberClass})` }
+    }
+    input.classId = classId
+  }
 
   if (role === ROLES.SERVED_MEMBER) {
     const fatherPhone = pick(row, "هاتف الأب", "father_phone")
@@ -165,20 +180,20 @@ export async function importUsersAction(
 
   const admin = createAdminClient()
 
-  // Best-effort class resolution for free-text class names in the sheet:
-  // exact match against the active classes table yields the FK; otherwise the
-  // legacy free-text name is kept as-is on served members.
+  // Class assignment in the sheet is by ID, not by name, so a class that was
+  // renamed (or two classes sharing a display name) can never be mixed up.
   const activeClasses = await admin
     .from("classes")
-    .select("id, name")
+    .select("id")
     .eq("is_active", true)
-  const classByName = new Map<string, string>()
-  for (const c of (activeClasses.data ?? [])) {
-    classByName.set(String(c.name ?? ""), String(c.id))
-  }
-  const resolveClassId = (name: string | undefined): string | undefined => {
-    if (!name) return undefined
-    return classByName.get(name.trim())
+  const activeClassIds = new Set<string>(
+    (activeClasses.data ?? []).map((c) => String(c.id)),
+  )
+  const classes: ClassLookup = {
+    resolve: (raw) => {
+      const value = raw.trim()
+      return UUID_RE.test(value) && activeClassIds.has(value) ? value : undefined
+    },
   }
 
   const results: ImportResult[] = []
@@ -187,15 +202,13 @@ export async function importUsersAction(
 
   for (let i = 0; i < rows.length; i++) {
     const rowNumber = i + 2
-    const validation = validateRow(rows[i], role, rowNumber)
+    const validation = validateRow(rows[i], role, rowNumber, classes)
 
     if (!validation.ok) {
       results.push({ row: rowNumber, ok: false, message: validation.message })
       failed++
       continue
     }
-
-    validation.input.classId = resolveClassId(validation.input.class)
 
     const result = await createAdminUser(admin, actor.actorId, validation.input)
 

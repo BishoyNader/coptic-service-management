@@ -8,37 +8,43 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { importUsersAction, type ImportResult } from "@/app/actions/import-users"
-import { ROLE_LABELS, type AppRole } from "@/lib/roles"
+import { type AppRole } from "@/lib/roles"
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   role: AppRole
+  /** Active classes — used for the sheet's `معرف الصف` reference list. */
+  classes?: ClassOption[]
 }
 
 type ParsedRow = Record<string, unknown>
+
+type ClassOption = { id: string; name: string }
 
 /** Columns that must be filled for served-member imports; the rest are optional. */
 const REQUIRED_MEMBER_HEADERS = new Set(["الاسم", "الموبايل", "كلمة المرور"])
 
 function getTemplateHeaders(role: AppRole): string[] {
   if (role === "SERVED_MEMBER") {
-    return ["الاسم", "الموبايل", "تاريخ الميلاد", "هاتف الأب", "هاتف الأم", "العنوان", "الصف", "كلمة المرور"]
+    return ["الاسم", "الموبايل", "تاريخ الميلاد", "هاتف الأب", "هاتف الأم", "العنوان", "معرف الصف", "كلمة المرور"]
   }
   return ["الاسم", "الموبايل", "تاريخ الميلاد", "كلمة المرور"]
 }
 
-function getTemplateSampleRows(role: AppRole): (string | number)[][] {
+function getTemplateSampleRows(role: AppRole, classes: ClassOption[]): (string | number)[][] {
   if (role === "SERVED_MEMBER") {
+    const [first, second] = classes
     return [
-      ["يوسف ناصر", "01012345678", "2000-05-15", "01098765432", "01087654321", "القاهرة", "الصف الأول", "12345678"],
-      ["مرى بخيت", "01123456789", "", "", "", "", "الصف الثاني", "87654321"],
+      ["يوسف ناصر", "01012345678", "2000-05-15", "01098765432", "01087654321", "القاهرة", first?.id ?? "", "12345678"],
+      ["مرى بخيت", "01123456789", "", "", "", "", second?.id ?? first?.id ?? "", "87654321"],
     ]
   }
   return [
@@ -47,9 +53,9 @@ function getTemplateSampleRows(role: AppRole): (string | number)[][] {
   ]
 }
 
-function downloadTemplate(role: AppRole) {
+function downloadTemplate(role: AppRole, classes: ClassOption[]) {
   const headers = getTemplateHeaders(role)
-  const sampleRows = getTemplateSampleRows(role)
+  const sampleRows = getTemplateSampleRows(role, classes)
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows])
   ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length * 1.5, 18) }))
   const wb = XLSX.utils.book_new()
@@ -58,11 +64,10 @@ function downloadTemplate(role: AppRole) {
   XLSX.writeFile(wb, `template-${label}.xlsx`)
 }
 
-export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
+export function ImportSheetDialog({ open, onOpenChange, role, classes = [] }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<"pick" | "preview" | "running" | "done">("pick")
   const [rows, setRows] = useState<ParsedRow[]>([])
-  const [errors, setErrors] = useState<string[]>([])
   const [results, setResults] = useState<ImportResult[]>([])
   const [created, setCreated] = useState(0)
   const [failed, setFailed] = useState(0)
@@ -71,7 +76,6 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
   const reset = useCallback(() => {
     setPhase("pick")
     setRows([])
-    setErrors([])
     setResults([])
     setCreated(0)
     setFailed(0)
@@ -123,7 +127,6 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
     if (busy) return
     setBusy(true)
     setPhase("running")
-    setErrors([])
     try {
       const result = await importUsersAction(rows, role)
       if (!result.ok) {
@@ -152,13 +155,13 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
   }, [rows, role, busy])
 
   const label = role === "SERVED_MEMBER" ? "المخدومين" : "الخدام"
-  const labelSingular = role === "SERVED_MEMBER" ? "مخدوم" : "خادم"
   const headers = getTemplateHeaders(role)
+  const classById = new Map(classes.map((c) => [c.id, c]))
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 gap-1.5 border-b p-4 pe-12">
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="size-5" />
             استيراد {label}
@@ -170,12 +173,17 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
           </DialogDescription>
         </DialogHeader>
 
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {phase === "pick" && (
-          <div className="space-y-4 py-2">
-            <Button variant="outline" className="gap-2" onClick={() => downloadTemplate(role)}>
+          <div className="space-y-4">
+            <Button variant="outline" className="gap-2" onClick={() => downloadTemplate(role, classes)}>
               <Download className="size-4" />
               تحميل قالب {label}
             </Button>
+
+            {role === "SERVED_MEMBER" && (
+              <ClassLegend classes={classes} />
+            )}
 
             <div
               className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/5"
@@ -197,6 +205,7 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
               className="hidden"
               onChange={handleFile}
             />
+
           </div>
         )}
 
@@ -211,8 +220,8 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
               </Button>
             </div>
 
-            <ScrollArea className="h-[300px] rounded-lg border">
-              <table className="w-full text-sm">
+            <ScrollArea className="h-[300px] max-w-full rounded-lg border">
+              <table className="w-max min-w-full text-sm">
                 <thead className="sticky top-0 bg-muted/80 backdrop-blur">
                   <tr>
                     <th className="px-3 py-2 text-center text-muted-foreground">#</th>
@@ -232,7 +241,10 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
                       <td className="px-3 py-2 text-center text-muted-foreground">{i + 2}</td>
                       {headers.map((h) => (
                         <td key={h} className="px-3 py-2 whitespace-nowrap">
-                          {String(row[h] ?? "")}
+                          {h === "معرف الصف"
+                            ? (classById.get(String(row[h] ?? "").trim())?.name ??
+                              String(row[h] ?? ""))
+                            : String(row[h] ?? "")}
                         </td>
                       ))}
                     </tr>
@@ -245,16 +257,6 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
                 </p>
               )}
             </ScrollArea>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={reset}>
-                إلغاء
-              </Button>
-              <Button onClick={handleImport} disabled={busy} className="gap-2">
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                استيراد {rows.length} {rows.length === 1 ? "صف" : "صفوف"}
-              </Button>
-            </div>
           </div>
         )}
 
@@ -291,13 +293,56 @@ export function ImportSheetDialog({ open, onOpenChange, role }: Props) {
                 </div>
               </ScrollArea>
             )}
-
-            <div className="flex justify-end">
-              <Button onClick={() => handleOpenChange(false)}>إغلاق</Button>
-            </div>
           </div>
+        )}
+        </div>
+
+        {(phase === "preview" || phase === "done") && (
+          <DialogFooter className="shrink-0 border-t bg-muted/50 p-4">
+            {phase === "preview" ? (
+              <>
+                <Button variant="outline" onClick={reset}>
+                  إلغاء
+                </Button>
+                <Button onClick={handleImport} disabled={busy} className="gap-2">
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                  استيراد {rows.length} {rows.length === 1 ? "صف" : "صفوف"}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => handleOpenChange(false)}>إغلاق</Button>
+            )}
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** The class → ID reference sheet: the importer needs the UUID, not the name. */
+function ClassLegend({ classes }: { classes: ClassOption[] }) {
+  if (classes.length === 0) {
+    return (
+      <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        لا توجد صفوف بعد — أنشئ صفًا أولًا من شاشة الأصناف قبل الاستيراد
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-2 rounded-xl border bg-muted/40 p-3">
+      <p className="text-xs font-medium">
+        اكتب <span className="font-bold">معرف الصف</span> في الشيت (مش اسم الصف):
+      </p>
+      <div className="max-h-40 space-y-1 overflow-y-auto">
+        {classes.map((c) => (
+          <div key={c.id} className="flex items-center justify-between gap-3 text-xs">
+            <span className="shrink-0 font-medium">{c.name}</span>
+            <code className="truncate rounded bg-background px-2 py-0.5 text-[11px] text-muted-foreground" dir="ltr">
+              {c.id}
+            </code>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

@@ -9,9 +9,12 @@ import type { AppRole } from "@/lib/roles"
 export function ImportUsersButton({
   role,
   label,
+  classes = [],
 }: {
   role: AppRole
   label?: string
+  /** Active classes — the sheet assigns members by class ID, not name. */
+  classes?: { id: string; name: string }[]
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -20,7 +23,7 @@ export function ImportUsersButton({
         <FileSpreadsheet className="size-3.5" />
         {label ?? `استيراد`}
       </Button>
-      <ImportSheetDialog open={open} onOpenChange={setOpen} role={role} />
+      <ImportSheetDialog open={open} onOpenChange={setOpen} role={role} classes={classes} />
     </>
   )
 }

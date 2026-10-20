@@ -11,6 +11,7 @@ import { getServerNow } from "@/services/attendance-service"
 import { getFridayAttendanceGrid, getFridayMinistryData } from "@/services/friday-service"
 import { getActiveStudyYear } from "@/services/study-year-service"
 import { getActiveScoringRules } from "@/services/scoring-service"
+import { listActiveClasses } from "@/services/classes-service"
 import { currentFridayIn } from "@/lib/friday"
 import { EmptyState } from "@/components/coptic/empty-state"
 import { AttendanceManagement } from "@/components/app/attendance-management"
@@ -44,7 +45,7 @@ export default async function SuperAdminAttendancePage({ searchParams }: Props) 
       ? params.friday
       : (currentFridayIn(schedule, now) ?? cairoDateString(now))
 
-  const [recordsResult, peopleResult, rulesResult] = await Promise.all([
+  const [recordsResult, peopleResult, rulesResult, classes] = await Promise.all([
     supabase
       .from("attendance_records")
       .select(
@@ -56,22 +57,27 @@ export default async function SuperAdminAttendancePage({ searchParams }: Props) 
       .limit(ATTENDANCE_PAGE_SIZE),
     supabase
       .from("profiles")
-      .select("id, full_name, role, phone, served_members(class)")
+      .select("id, full_name, role, phone, served_members(class_id, class)")
       .in("role", [ROLES.SERVED_MEMBER, ROLES.SERVANT])
       .eq("status", "ACTIVE")
       .order("full_name")
       .limit(300),
     getActiveScoringRules(admin),
+    listActiveClasses(admin),
   ])
 
   const records = toAttendanceRows((recordsResult.data ?? []) as never[])
-  const people = (peopleResult.data ?? []).map((p) => ({
-    id: p.id as string,
-    fullName: p.full_name as string,
-    role: p.role as "SERVED_MEMBER" | "SERVANT",
-    phone: p.phone as string,
-    className: (p.served_members as { class?: string } | null)?.class ?? null,
-  }))
+  const classNameById = new Map(classes.map((c) => [c.id, c.name]))
+  const people = (peopleResult.data ?? []).map((p) => {
+    const detail = p.served_members as { class?: string; class_id?: string } | null
+    return {
+      id: p.id as string,
+      fullName: p.full_name as string,
+      role: p.role as "SERVED_MEMBER" | "SERVANT",
+      phone: p.phone as string,
+      className: classNameById.get(detail?.class_id ?? "") ?? detail?.class ?? null,
+    }
+  })
 
   const [fridayGrid, fridayMinistry] = await Promise.all([
     getFridayAttendanceGrid(admin, selectedFriday),

@@ -83,7 +83,7 @@ export async function exportMembersAction(): Promise<ExportActionResult> {
     } else {
       query = admin
         .from("profiles")
-        .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class)")
+        .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class_id, class)")
         .eq("role", "SERVED_MEMBER")
         .order("full_name", { ascending: true })
         .limit(MEMBERS_EXPORT_LIMIT)
@@ -91,7 +91,7 @@ export async function exportMembersAction(): Promise<ExportActionResult> {
   } else {
     query = ctx.supabase
       .from("profiles")
-      .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class)")
+      .select("full_name, phone, role, status, date_of_birth, created_at, served_members(class_id, class)")
       .eq("role", "SERVED_MEMBER")
       .order("full_name", { ascending: true })
       .limit(MEMBERS_EXPORT_LIMIT)
@@ -100,16 +100,20 @@ export async function exportMembersAction(): Promise<ExportActionResult> {
   const { data } = await query
 
   const csv = toCsv(
-    ["الاسم", "الموبايل", "الدور", "الحالة", "تاريخ الميلاد", "الصف", "تاريخ الإنشاء"],
-    (data ?? []).map((r) => [
-      r.full_name,
-      r.phone,
-      r.role,
-      r.status,
-      r.date_of_birth ?? "",
-      (r.served_members as { class?: string } | null)?.class ?? "",
-      new Date(r.created_at).toLocaleDateString("ar-EG"),
-    ]),
+    ["الاسم", "الموبايل", "الدور", "الحالة", "تاريخ الميلاد", "معرف الصف", "الصف", "تاريخ الإنشاء"],
+    (data ?? []).map((r) => {
+      const detail = r.served_members as { class?: string; class_id?: string } | null
+      return [
+        r.full_name,
+        r.phone,
+        r.role,
+        r.status,
+        r.date_of_birth ?? "",
+        detail?.class_id ?? "",
+        detail?.class ?? "",
+        new Date(r.created_at).toLocaleDateString("ar-EG"),
+      ]
+    }),
   )
 
   return { ok: true, csv, filename: "members.csv" }

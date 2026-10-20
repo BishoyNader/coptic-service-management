@@ -37,7 +37,7 @@ export default async function SuperAdminMembersPage({
 
   let query = supabase
     .from("profiles")
-    .select("id, full_name, phone, status, date_of_birth, served_members(class)", { count: "exact" })
+    .select("id, full_name, phone, status, date_of_birth, served_members(class_id, class)", { count: "exact" })
     .eq("role", "SERVED_MEMBER")
     .order("full_name", { ascending: true })
     .order("id")
@@ -53,6 +53,14 @@ export default async function SuperAdminMembersPage({
   const activeSearchParams: Record<string, string> = {}
   if (q) activeSearchParams.q = q
 
+  // The sheet/API writes the class FK; the legacy free-text column is only a
+  // fallback, so resolve display names from the FK where possible.
+  const classNameById = new Map(classes.map((c) => [c.id, c.name]))
+  const classLabelOf = (detail: { class?: string; class_id?: string } | null) => {
+    if (!detail) return null
+    return classNameById.get(detail.class_id ?? "") ?? detail.class ?? null
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -62,7 +70,7 @@ export default async function SuperAdminMembersPage({
         </div>
         <div className="flex items-center gap-2">
           <ExportButton action={exportMembersAction} label="تصدير CSV" />
-          <ImportUsersButton role="SERVED_MEMBER" label="استيراد" />
+          <ImportUsersButton role="SERVED_MEMBER" label="استيراد" classes={classes} />
           <AddUserButton label="إضافة مخدوم" defaultRole="SERVED_MEMBER" classes={classes} />
         </div>
       </div>
@@ -106,9 +114,9 @@ export default async function SuperAdminMembersPage({
                       <Phone className="size-3" />
                       {m.phone}
                     </span>
-                    {(m.served_members as { class?: string } | null)?.class && (
+                    {classLabelOf(m.served_members as { class?: string; class_id?: string } | null) && (
                       <span className="rounded-full bg-coptic-gold-soft px-2 py-0.5 text-[10px] font-medium text-coptic-gold">
-                        {(m.served_members as { class?: string } | null)?.class}
+                        {classLabelOf(m.served_members as { class?: string; class_id?: string } | null)}
                       </span>
                     )}
                   </div>
